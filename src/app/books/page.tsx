@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/app/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
@@ -31,7 +31,7 @@ const BOOK_CATEGORIES = {
         cover_url: 'https://m.media-amazon.com/images/I/91EyNHRJtZL._AC_UL480_FMwebp_QL65_.jpg',
         description: '明治時代の日本を舞台に、友情と裏切り、愛と罪悪感を描いた名作',
         category: 'popular',
-        isPublicDomain: true
+        isPublicDomain: false
       },
       {
         id: 'pop-2',
@@ -40,7 +40,7 @@ const BOOK_CATEGORIES = {
         cover_url: 'https://m.media-amazon.com/images/I/81T0U8V-7FS._AC_UL480_FMwebp_QL65_.jpg',
         description: '人間性を失っていく主人公の苦悩を描いた自伝的小説',
         category: 'popular',
-        isPublicDomain: true
+        isPublicDomain: false
       },
       {
         id: 'pop-3',
@@ -49,7 +49,7 @@ const BOOK_CATEGORIES = {
         cover_url: 'https://covers.openlibrary.org/b/id/12583098-L.jpg',
         description: '江戸っ子気質の主人公が地方の中学校で巻き起こす騒動を描く',
         category: 'popular',
-        isPublicDomain: true
+        isPublicDomain: false
       },
       {
         id: 'pop-4',
@@ -58,7 +58,7 @@ const BOOK_CATEGORIES = {
         cover_url: 'https://m.media-amazon.com/images/I/71iSzDd9HIL._AC_UL480_FMwebp_QL65_.jpg',
         description: '友情と信頼をテーマにした短編小説の傑作',
         category: 'popular',
-        isPublicDomain: true
+        isPublicDomain: false
       },
       {
         id: 'pop-5',
@@ -78,7 +78,6 @@ const BOOK_CATEGORIES = {
         category: 'popular',
         isPublicDomain: false
       },
-      // 12冊まで追加可能
     ]
   },
   classics: {
@@ -91,7 +90,7 @@ const BOOK_CATEGORIES = {
         cover_url: 'https://m.media-amazon.com/images/I/71mrYjYkw7L._AC_UL480_FMwebp_QL65_.jpg',
         description: '猫の視点から人間社会を風刺した長編小説',
         category: 'classics',
-        isPublicDomain: true
+        isPublicDomain: false
       },
       {
         id: 'cls-2',
@@ -100,7 +99,7 @@ const BOOK_CATEGORIES = {
         cover_url: 'https://m.media-amazon.com/images/I/71hF1DDSHaL._AC_UL480_FMwebp_QL65_.jpg',
         description: '少年ジョバンニの幻想的な銀河鉄道の旅を描いた童話',
         category: 'classics',
-        isPublicDomain: true
+        isPublicDomain: false
       },
       {
         id: 'cls-3',
@@ -109,7 +108,7 @@ const BOOK_CATEGORIES = {
         cover_url: 'https://m.media-amazon.com/images/I/71G17az7Y-L._AC_UL480_FMwebp_QL65_.jpg',
         description: '平安時代の羅生門を舞台に人間のエゴイズムを描く',
         category: 'classics',
-        isPublicDomain: true
+        isPublicDomain: false
       },
       {
         id: 'cls-4',
@@ -118,7 +117,7 @@ const BOOK_CATEGORIES = {
         cover_url: 'https://m.media-amazon.com/images/I/71MQHZ5F7aL._AC_UL480_FMwebp_QL65_.jpg',
         description: '地獄に落ちた男が蜘蛛の糸を登ろうとする物語',
         category: 'classics',
-        isPublicDomain: true
+        isPublicDomain: false
       },
       {
         id: 'cls-5',
@@ -127,7 +126,7 @@ const BOOK_CATEGORIES = {
         cover_url: 'https://m.media-amazon.com/images/I/513M3302GEL._AC_UL480_FMwebp_QL65_.jpg',
         description: 'ドイツ留学中の日本人青年の悲恋を描いた作品',
         category: 'classics',
-        isPublicDomain: true
+        isPublicDomain: false
       },
       {
         id: 'cls-6',
@@ -136,7 +135,7 @@ const BOOK_CATEGORIES = {
         cover_url: 'https://m.media-amazon.com/images/I/71oAje5bxYL._AC_UL480_FMwebp_QL65_.jpg',
         description: '詩人が虎に変身する中国の伝説を基にした短編',
         category: 'classics',
-        isPublicDomain: true
+        isPublicDomain: false
       },
     ]
   },
@@ -243,10 +242,42 @@ export default function BooksPage() {
   const [totalResults, setTotalResults] = useState(0);
   const [currentPage, setCurrentPage] = useState(0);
 
-  // Google Books APIで検索
+  const [aozoraBooks, setAozoraBooks] = useState<Book[]>([]);
+  const [loadingAozora, setLoadingAozora] = useState(true);
+
+  useEffect(() => {
+    fetchAozoraBooks();
+  }, []);
+
+  const fetchAozoraBooks = async () => {
+    try {
+      setLoadingAozora(true);
+      const { data, error } = await supabase
+        .from('aozora_books')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      const books: Book[] = data.map((book: any) => ({
+        id: book.id,
+        title: book.title,
+        author: book.author,
+        cover_url: book.cover_url || '',
+        description: book.description || '',
+        isPublicDomain: book.is_free,
+      }));
+
+      setAozoraBooks(books);
+    } catch (error) {
+      console.error('❌ 青空文庫の本の取得エラー:', error);
+    } finally {
+      setLoadingAozora(false);
+    }
+  };
+
   const searchBooks = async (loadMore = false) => {
     if (!searchQuery.trim()) {
-      // 検索クエリが空の場合はカテゴリー表示に戻る
       setIsShowingSearchResults(false);
       setSearchResults([]);
       return;
@@ -271,7 +302,6 @@ export default function BooksPage() {
 
       const data = await response.json();
       
-      // APIの結果をBook型に変換
       const books: Book[] = data.books.map((book: any) => ({
         id: book.id,
         title: book.title,
@@ -303,14 +333,12 @@ export default function BooksPage() {
     }
   };
 
-  // エンターキーで検索
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       searchBooks();
     }
   };
 
-  // 検索クエリが空になったらカテゴリー表示に戻る
   const handleSearchInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setSearchQuery(value);
@@ -321,55 +349,64 @@ export default function BooksPage() {
     }
   };
 
-  // 本棚に追加
-  const addToBookshelf = async (book: Book, status: string) => {
+  // ✨ 修正：本棚に追加する時に追加情報も保存
+const addToBookshelf = async (book: Book, status: string) => {
+  if (!isLoggedIn) {
+    alert('ログインが必要です');
+    router.push('/login');
+    return;
+  }
+
+  try {
+    setAdding(book.id);
+
+    // ✨ デバッグ：送信するデータを確認
+    const bookData = {
+      user_id: user?.id,
+      title: book.title,
+      author: book.author,
+      cover_url: book.cover_url,
+      status: status,
+      aozora_book_id: book.isPublicDomain ? book.id : null,
+      preview_link: book.previewLink || null,
+      buy_link: book.buyLink || null,
+    };
+
+    console.log('📤 送信するデータ:', bookData);
+
+    const { data, error } = await supabase
+      .from('bookshelves')
+      .insert([bookData]);
+
+    if (error) {
+      console.error('❌ エラーの詳細:', error);
+      console.error('エラーコード:', error.code);
+      console.error('エラーメッセージ:', error.message);
+      console.error('エラー詳細:', error.details);
+      throw error;
+    }
+
+    console.log('✅ 成功:', data);
+    alert(`「${book.title}」を本棚に追加しました！`);
+    setShowStatusModal(false);
+    setSelectedBook(null);
+  } catch (error) {
+    console.error('本棚への追加エラー:', error);
+    alert('本棚への追加に失敗しました');
+  } finally {
+    setAdding(null);
+  }
+};
+  const openStatusModal = (book: Book) => {
     if (!isLoggedIn) {
       alert('ログインが必要です');
       router.push('/login');
       return;
     }
-
-    setAdding(book.id);
-
-    try {
-      const { error } = await supabase
-        .from('bookshelves')
-        .insert([
-          {
-            user_id: user?.id,
-            title: book.title,
-            author: book.author,
-            cover_url: book.cover_url || null,
-            status: status
-          }
-        ]);
-
-      if (error) {
-        if (error.code === '23505') {
-          alert('この本は既に本棚に追加されています');
-        } else {
-          throw error;
-        }
-      } else {
-        alert('本棚に追加しました！');
-        setShowStatusModal(false);
-        setSelectedBook(null);
-      }
-    } catch (error) {
-      console.error('追加エラー:', error);
-      alert('本棚への追加に失敗しました');
-    } finally {
-      setAdding(null);
-    }
-  };
-
-  // 状態選択モーダルを開く
-  const openStatusModal = (book: Book) => {
     setSelectedBook(book);
     setShowStatusModal(true);
   };
 
-  // 本のカバー表示
   const getBookCover = (book: Book, index: number) => {
     if (book.cover_url) {
       return <img src={book.cover_url} alt={book.title} className="w-full h-full object-cover" />;
@@ -393,21 +430,17 @@ export default function BooksPage() {
     );
   };
 
-  // 本のカードコンポーネント
   const BookCard = ({ book, index }: { book: Book; index: number }) => (
     <div className="bg-white rounded-xl overflow-hidden shadow-md hover:shadow-xl transition hover:-translate-y-1">
-      {/* 本の表紙 */}
       <div className="aspect-[2/3] overflow-hidden">
         {getBookCover(book, index)}
       </div>
 
-      {/* 本の情報 */}
       <div className="p-4">
         <h3 className="font-bold text-base text-gray-900 mb-1 line-clamp-1">{book.title}</h3>
         <p className="text-sm text-gray-500 mb-2">{book.author}</p>
         <p className="text-xs text-gray-600 mb-3 line-clamp-2">{book.description}</p>
         
-        {/* 著作権状態の表示 */}
         {book.isPublicDomain && (
           <div className="mb-2">
             <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded">
@@ -416,16 +449,13 @@ export default function BooksPage() {
           </div>
         )}
 
-        {/* 価格表示 */}
         {book.price && (
           <p className="text-sm font-bold text-blue-600 mb-2">
             ¥{book.price.toLocaleString()}
           </p>
         )}
         
-        {/* アクションボタン */}
         <div className="space-y-2">
-          {/* 青空文庫の本なら「読む」ボタンを表示 */}
           {book.isPublicDomain && (
             <Link
               href={`/reader/${book.id}`}
@@ -435,7 +465,6 @@ export default function BooksPage() {
             </Link>
           )}
           
-          {/* 本棚に追加ボタン */}
           <button
             onClick={() => openStatusModal(book)}
             disabled={adding === book.id}
@@ -448,7 +477,6 @@ export default function BooksPage() {
             {adding === book.id ? '追加中...' : '📚 本棚に追加'}
           </button>
 
-          {/* 購入リンク */}
           {book.buyLink && (
             <a
               href={book.buyLink}
@@ -468,13 +496,11 @@ export default function BooksPage() {
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="container mx-auto px-6 max-w-7xl">
         
-        {/* ヘッダー */}
         <div className="mb-8">
           <h1 className="text-4xl font-bold text-gray-900 mb-2">📖 本を探す</h1>
           <p className="text-gray-600">お気に入りの本を見つけて本棚に追加しましょう</p>
         </div>
 
-        {/* 検索バー */}
         <div className="mb-8 flex gap-4">
           <input
             type="text"
@@ -493,7 +519,6 @@ export default function BooksPage() {
           </button>
         </div>
 
-        {/* 検索結果表示 */}
         {isShowingSearchResults ? (
           <div>
             <h2 className="text-2xl font-bold text-gray-900 mb-6">
@@ -508,7 +533,6 @@ export default function BooksPage() {
                   ))}
                 </div>
 
-                {/* もっと読み込むボタン */}
                 {searchResults.length < totalResults && (
                   <div className="text-center">
                     <button
@@ -528,8 +552,26 @@ export default function BooksPage() {
             )}
           </div>
         ) : (
-          // カテゴリー別表示
           <div className="space-y-12">
+            {aozoraBooks.length > 0 && (
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900 mb-6">
+                  📖 青空文庫 ({aozoraBooks.length}冊)
+                </h2>
+                {loadingAozora ? (
+                  <div className="text-center py-12">
+                    <p className="text-gray-600">読み込み中...</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                    {aozoraBooks.map((book, index) => (
+                      <BookCard key={book.id} book={book} index={index} />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             {Object.entries(BOOK_CATEGORIES).map(([key, category]) => (
               <div key={key}>
                 <h2 className="text-2xl font-bold text-gray-900 mb-6">
@@ -547,7 +589,6 @@ export default function BooksPage() {
 
       </div>
 
-      {/* 読書状態選択モーダル */}
       {showStatusModal && selectedBook && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-8">
           <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-8">
@@ -606,3 +647,6 @@ export default function BooksPage() {
     </div>
   );
 }
+
+
+

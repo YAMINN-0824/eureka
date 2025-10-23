@@ -3,147 +3,500 @@
 import { useState, useEffect } from 'react';
 import { useParams, notFound } from 'next/navigation';
 import Link from 'next/link';
+import { supabase } from '@/lib/supabase';
 
-// 1. Book（本）の型を、ここでハッキリと定義します
+// Google Maps の型定義
+declare global {
+  interface Window {
+    google: any;
+  }
+}
+
 interface Book {
+  id: string;
   title: string;
   author: string;
   content: string;
 }
 
-// 2. AOZORA_BOOKSの型を「any」ではなく、正しい「Book」型にします
-const AOZORA_BOOKS: Record<string, Book> = {
-  'pop-1': {
-    title: 'こころ',
-    author: '夏目漱石',
-    content: `上　先生と私
+interface WordDefinition {
+  word: string;
+  reading: string;
+  old_meaning: string;
+  modern_meaning: string;
+  example: string;
+  notes: string;
+}
 
-一
+interface Location {
+  id: string;
+  location_name: string;
+  latitude: number;
+  longitude: number;
+  description: string;
+  character_name: string;
+}
 
-　私はその人を常に先生と呼んでいた。だからここでもただ先生と書くだけで本名は打ち明けない。これは世間を憚かる遠慮というよりも、その方が私にとって自然だからである。私はその人の記憶を呼び起すごとに、すぐ「先生」といいたくなる。筆を執っても心持は同じ事である。よそよそしい頭文字などはとても使う気にならない。
-
-　私が先生と知り合いになったのは鎌倉である。その時私はまだ若々しい書生であった。暑中休暇を利用して海水浴に行った友達からぜひ来いという端書を受け取ったので、私は多少の金を工面して、出掛ける事にした。私は金の工面に二、三日を費やした。ところが私が鎌倉に着いて三日と経たないうちに、私を呼び寄せた友達は、急に国元から帰れという電報を受け取った。電報には母が病気だからと断ってあったけれども友達はそれを信じなかった。友達はかねてから国元にいる親たちに勧ない結婚を強いられていた。彼は現代の習慣からいうと結婚するにはあまり年が若過ぎた。それに肝心の当人が気に入らなかった。それで夏休みに当然帰るべきところを、わざと避けて東京の近くで遊んでいたのである。彼は電報を私に見せてどうしようと相談をした。私にはどうしていいか分らなかった。けれども実際彼の母が病気であるとすれば彼は固より帰るべきはずであった。それで彼はとうとう帰る事になった。せっかく来た私は一人取り残された。
-
-　学校の授業が始まるにはまだ大分日数があるので鎌倉におってもよし、帰ってもよいという境遇にいた私は、当分元の宿に留まる覚悟をした。友達は中国のある資産家の息子で金に不自由のない男であったけれども、学校が学校なのと年が年なので、生活の程度は私とそう変りもしなかった。したがって一人ぼっちになった私は別に恐ろしい物でも持てあますように感じなかった。
-
-　宿は鎌倉でも辺鄙な方角にあった。玉突きだのアイスクリームだのというハイカラなものには長い畷を一つ越さなければ手が届かなかった。車で行っても二十銭は取られた。けれども個人の別荘はそこここにいくつでも建てられていた。それに海へはごく近いので海水浴をやるには至極便利な地位を占めていた。
-
-　私は毎日海へはいりに出かけた。古い燻ぶり返った藁葺の間を通り抜けて磯へ下りると、この辺にこれほどの都会人種が住んでいるかと思うほど、避暑に来た男や女で砂の上が動いていた。ある時は海の中が銭湯のように黒い頭でごちゃごちゃしている事もあった。その中に知った人を一人ももたない私も、こういう賑やかな景色の中に裹まれて、砂の上に寝そべってみたり、膝頭を波に打たしてそこいらを跳ね廻るのは愉快であった。
-
-　私は実に先生をこの雑沓の間に見付け出したのである。その時海岸には掛茶屋が二軒あった。私はふとした機会からその一軒の方に行き慣れていた。長谷辺に大きな別荘を構えている人と違って、各自に専有の着換場を拵えていないここいらの避暑客には、ぜひともこうした共同着換所といった風なものが必要なのであった。彼らはここで茶を飲み、ここで休息する外に、ここで海水着を洗濯させたり、ここで鹹はゆい身体を清めたり、ここへ帽子や傘を預けたりするのである。海水着を持たない私にも持物を盗まれる恐れはあったので、私は海へはいるたびにその茶屋へ一切を脱ぎ棄てる事にしていた。
-（続く...）`
-  },
-  'pop-2': {
-    title: '人間失格',
-    author: '太宰治',
-    content: `はしがき
-
-　私は、その男の写真を三葉、見たことがある。
-
-　一葉は、その男の、幼年時代、とでも言うべきであろうか、十歳前後かと推定される頃の写真であって、その子供が大勢の女のきょうだいと一緒に写っている。
-
-　庭園の池のほとりに、おそらくは夏の日でもあろう、その子供は、印半纏を着て、光琳模様か何かの派手な女帯を締め、袴をはいて、白い靴下、草履をはき、首を三十度ほど左に傾け、醜く笑っている。醜く、といっても、決して、いわゆる「変顔」の類いではない。表情は極めて自然である。つまり、その子供は、よい子らしく笑わせられて写真に収まったのであるが、しかし、いかに人間じみて自然な笑いであっても、そしてまた、いかに明るく美しい子供であっても、笑っている写真は、見る人に何か不愉快の感じを与えるものらしい。まして、その子供の場合、笑顔のままで硬化したというような感じではなく、何か、こう、奇妙にひずんでいる。まるで、その子供は、お化けになりすまして、女たちを脅おどかして遊んでいるような表情に見える。おそらくは、彼の幼年時代のなごやかな一日であったのだろうが、しかし、私の目には、ひどく気味の悪い不吉の微笑のように見えるのである。
-
-　いったい、どこに、どんな表情の顔を持った幼児がいるのだろう、その子供は両手を大きく左右にひろげ、やや斜めに身体を乗り出して、醜い笑顔を作っている。私は、この写真を見るたびに、いやな気持になって、この、どこか変にひねくれた感じのする子供が、はたして、やがて、どのような大人になったか、それを予想して見ることさえ、いまわしく、考えたくもない気持になるのである。
-
-　もう一葉の写真は、高等学校時代、と思われる。これは、たしかに、美貌といっていいくらいの学生である。しかし、これもまた、不思議にも生きている人間の感じはしなかった。学生服を着て、胸のポケットから白いハンケチをのぞかせ、籐椅子に腰かけて足を組み、そうして、やはり、笑っている。こんどの笑顔は、皺くちゃの猿の笑いでもなければ、また、お化けの笑いでもない、かなり巧みな微笑になってはいるが、しかし、やはり、何か、ひとを「ごまかす」ような、ずるい印象を与える。私は、その美貌と不調和なくらいにへんてこな表情に接して、ふと、「死相」という言葉を思い出し、ぞっとし、いまだに、それが、彼の高等学校時代の写真であるか、大学時代の写真であるか、はっきりしない理由も、あるいは、それのせいかも知れない、とにかく、生きている実感が無く、つまり、生か死か、幽霊か生身の人間か、それさえ、私にはいまだに判然としない、気味の悪い写真なのである。いや、私はいままで、こんな不思議な表情の美青年の写真を見た事がない。
-（続く...）`
-  },
-  'pop-3': {
-    title: '坊っちゃん',
-    author: '夏目漱石',
-    content: `一
-
-　親譲りの無鉄砲で小供の時から損ばかりしている。小学校に居る時分学校の二階から飛び降りて一週間ほど腰を抜かした事がある。なぜそんな無闇をしたと聞く人があるかも知れぬ。別段深い理由でもない。新築の二階から首を出していたら、同級生の一人が冗談に、いくら威張っても、そこから飛び降りる事は出来まい。弱虫やーい。と囃したからである。小使に負ぶさって帰って来た時、おやじが大きな眼をして二階ぐらいから飛び降りて腰を抜かす奴があるかと云ったから、この次は抜かさずに飛んで見せますと答えた。
-
-　親類のものから西洋製のナイフを貰って奇麗な刃を日に翳して、友達に見せていたら、一人が光る事は光るが切れそうもないと云った。切れぬ事があるか、何でも切ってみせると受け合った。そんなら君の指を切ってみろと注文したから、何だ指ぐらいこの通りだと右の手の親指の甲をはすに切り込んだ。幸ナイフが小さいのと、親指の骨が堅かったので、今だに親指は手に付いている。しかし創痕は死ぬまで消えぬ。
-
-　庭を東へ二十歩に行き尽すと、南上がりにいささかばかりの菜園があって、真中に栗の木が一本立} `
-  },
-};
-
-export default function BookReaderPage() {
-  const params = useParams(); // 3. useEffectの外に出します
-  const { id } = params;      // idも外に出します
+export default function ImprovedReaderPage() {
+  const params = useParams();
+  const { id } = params;
 
   const [book, setBook] = useState<Book | null>(null);
   const [loading, setLoading] = useState(true);
-  const [fontSize, setFontSize] = useState(16); // 読書用に文字サイズも管理
+  const [fontSize, setFontSize] = useState(18);
+  
+  // ダイアログの状態
+  const [showTranslationDialog, setShowTranslationDialog] = useState(false);
+  const [showMapDialog, setShowMapDialog] = useState(false);
+  
+  // データ
+  const [selectedWord, setSelectedWord] = useState<WordDefinition | null>(null);
+  const [locations, setLocations] = useState<Location[]>([]);
+  const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
+  const [distance, setDistance] = useState<string>('');
+  
+  // 検索機能
+  const [searchQuery, setSearchQuery] = useState('');
 
-  // 4. 最大のバグ修正：依存配列に [id] を追加します
   useEffect(() => {
-    setLoading(true); // ページが変わるたびにローディングを開始
     if (id) {
-      const bookData = AOZORA_BOOKS[id as string];
+      loadBook();
+      loadLocations();
+    }
+  }, [id]);
+
+  useEffect(() => {
+    // Google Maps APIをロード
+    if (showMapDialog && typeof window !== 'undefined' && !window.google) {
+      const script = document.createElement('script');
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places`;
+      script.async = true;
+      script.defer = true;
+      document.head.appendChild(script);
       
-      if (bookData) {
-        setBook(bookData);
+      script.onload = () => {
+        setTimeout(() => initMap(), 100);
+      };
+    } else if (showMapDialog && typeof window !== 'undefined' && window.google) {
+      setTimeout(() => initMap(), 100);
+    }
+  }, [showMapDialog, locations]);
+
+  const initMap = () => {
+    if (typeof window === 'undefined' || !window.google || locations.length === 0) return;
+
+    const mapElement = document.getElementById('map');
+    if (!mapElement) return;
+
+    // 最初の場所を中心に
+    const center = {
+      lat: locations[0].latitude,
+      lng: locations[0].longitude
+    };
+
+    const map = new window.google.maps.Map(mapElement, {
+      zoom: 11,
+      center: center,
+      mapTypeId: 'roadmap'
+    });
+
+    // 各場所にマーカーを配置
+    locations.forEach((location, index) => {
+      const marker = new window.google.maps.Marker({
+        position: { lat: location.latitude, lng: location.longitude },
+        map: map,
+        title: location.location_name,
+        label: (index + 1).toString(),
+        animation: window.google.maps.Animation.DROP
+      });
+
+      // マーカークリックで情報表示
+      const infoWindow = new window.google.maps.InfoWindow({
+        content: `
+          <div style="padding: 10px; max-width: 200px;">
+            <h3 style="font-weight: bold; margin-bottom: 5px;">${location.location_name}</h3>
+            ${location.character_name ? `<p style="margin-bottom: 5px; color: #3b82f6;">👤 ${location.character_name}</p>` : ''}
+            <p style="color: #666; font-size: 14px;">${location.description}</p>
+          </div>
+        `
+      });
+
+      marker.addListener('click', () => {
+        infoWindow.open(map, marker);
+        setSelectedLocation(location);
+      });
+    });
+
+    // 線で繋ぐ
+    if (locations.length > 1) {
+      const path = locations.map(loc => ({
+        lat: loc.latitude,
+        lng: loc.longitude
+      }));
+
+      new window.google.maps.Polyline({
+        path: path,
+        geodesic: true,
+        strokeColor: '#4285F4',
+        strokeOpacity: 0.8,
+        strokeWeight: 4,
+        map: map
+      });
+
+      // 距離を計算
+      calculateDistance();
+    }
+  };
+
+  const calculateDistance = () => {
+    if (locations.length < 2) return;
+
+    const R = 6371; // 地球の半径（km）
+    let totalDistance = 0;
+
+    for (let i = 0; i < locations.length - 1; i++) {
+      const lat1 = locations[i].latitude * Math.PI / 180;
+      const lat2 = locations[i + 1].latitude * Math.PI / 180;
+      const deltaLat = (locations[i + 1].latitude - locations[i].latitude) * Math.PI / 180;
+      const deltaLng = (locations[i + 1].longitude - locations[i].longitude) * Math.PI / 180;
+
+      const a = Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2) +
+                Math.cos(lat1) * Math.cos(lat2) *
+                Math.sin(deltaLng / 2) * Math.sin(deltaLng / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      const distance = R * c;
+
+      totalDistance += distance;
+    }
+
+    setDistance(`${totalDistance.toFixed(1)} km`);
+  };
+
+  const loadBook = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('aozora_books')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (error) throw error;
+      setBook(data);
+    } catch (error) {
+      console.error('本の読み込みエラー:', error);
+      notFound();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadLocations = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('book_locations')
+        .select('*')
+        .eq('book_id', id)
+        .order('order_index');
+
+      if (error) throw error;
+      setLocations(data || []);
+    } catch (error) {
+      console.error('場所の読み込みエラー:', error);
+    }
+  };
+
+  // 言葉を選択したときの処理
+  const handleTextSelection = async () => {
+    const selection = window.getSelection();
+    const selectedText = selection?.toString().trim();
+
+    if (selectedText && selectedText.length > 0 && selectedText.length < 20) {
+      console.log('選択された言葉:', selectedText);
+      
+      // データベースから辞書を検索
+      const { data, error } = await supabase
+        .from('word_dictionary')
+        .select('*')
+        .eq('word', selectedText)
+        .single();
+
+      if (data) {
+        console.log('辞書で見つかりました:', data);
+        setSelectedWord(data);
+        setShowTranslationDialog(true);
+        setShowMapDialog(false);
       } else {
-        // 5. 改善：見つからない場合は 'not-found' ページを表示します
-        notFound(); 
+        console.log('辞書に見つかりませんでした');
+        setSelectedWord({
+          word: selectedText,
+          reading: '',
+          old_meaning: '辞書に登録されていません',
+          modern_meaning: '',
+          example: '',
+          notes: 'この言葉はまだ辞書に追加されていません'
+        });
+        setShowTranslationDialog(true);
+        setShowMapDialog(false);
       }
     }
-    setLoading(false);
-  }, [id]); // ← ★★★[id] を追加★★★
+  };
 
-  // 文字サイズを変更する関数
+  const closeTranslationDialog = () => {
+    setShowTranslationDialog(false);
+    setSelectedWord(null);
+    window.getSelection()?.removeAllRanges();
+  };
+
+  const openMapDialog = () => {
+    setShowMapDialog(true);
+    setShowTranslationDialog(false);
+  };
+
+  const closeMapDialog = () => {
+    setShowMapDialog(false);
+    setSelectedLocation(null);
+  };
+
   const increaseFontSize = () => setFontSize((size) => Math.min(size + 2, 32));
   const decreaseFontSize = () => setFontSize((size) => Math.max(size - 2, 12));
 
-  // 6. JSX（画面の見た目）の部分を追加
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-screen">
-        読み込み中...
+        <div className="text-xl text-gray-600">読み込み中...</div>
       </div>
     );
   }
 
-  // bookがnullの場合はnotFound()で処理されるので、ここでは必ずbookが存在します
   if (!book) {
-     // useEffectでnotFound()が呼ばれるため、通常ここには来ません
     return <div>本が見つかりません。</div>;
   }
 
+  const showDialog = showTranslationDialog || showMapDialog;
+
   return (
-    <div className="max-w-3xl mx-auto p-4 md:p-8">
+    <div className="h-screen flex flex-col bg-gray-50">
       
-      {/* 1. ヘッダー：戻るボタンと文字サイズ変更 */}
-      <header className="flex justify-between items-center mb-6 pb-4 border-b">
-        <Link href="/" className="text-blue-600 hover:underline">
-          &larr; 本棚に戻る
-        </Link>
-        <div className="flex items-center gap-2">
+      {/* ヘッダー */}
+      <header className="bg-white border-b px-6 py-4 flex justify-between items-center shadow-sm">
+        <div className="flex items-center gap-4">
+          <Link href="/my-bookshelf" className="text-blue-600 hover:underline font-medium">
+            ← 本棚に戻る
+          </Link>
+          <h1 className="text-xl font-bold text-gray-900">{book.title}</h1>
+          <span className="text-gray-500">- {book.author}</span>
+        </div>
+        
+        <div className="flex items-center gap-4">
+          {/* 場所表示ボタン */}
           <button
-            onClick={decreaseFontSize}
-            className="px-4 py-2 bg-gray-200 rounded text-lg font-bold hover:bg-gray-300"
+            onClick={openMapDialog}
+            className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition font-medium flex items-center gap-2"
           >
-            A-
+            🗺️ 物語の舞台
           </button>
-          <span className="text-sm w-8 text-center">{fontSize}px</span>
-          <button
-            onClick={increaseFontSize}
-            className="px-4 py-2 bg-gray-200 rounded text-lg font-bold hover:bg-gray-300"
-          >
-            A+
-          </button>
+          
+          {/* 文字サイズ */}
+          <div className="flex items-center gap-2">
+            <button onClick={decreaseFontSize} className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 font-bold">
+              A-
+            </button>
+            <span className="text-sm w-12 text-center font-medium">{fontSize}px</span>
+            <button onClick={increaseFontSize} className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 font-bold">
+              A+
+            </button>
+          </div>
         </div>
       </header>
 
-      {/* 2. 本のタイトルと著者 */}
-      <article>
-        <h1 className="text-3xl md:text-4xl font-bold mb-2">{book.title}</h1>
-        <h2 className="text-xl text-gray-600 mb-8">{book.author}</h2>
-
-        {/* 3. 本文 */}
-        {/* style属性を使って、動的に文字サイズを変更します */}
-        <div
-          className="whitespace-pre-line leading-relaxed"
-          style={{ fontSize: `${fontSize}px` }}
+      {/* メインコンテンツ */}
+      <div className="flex-1 flex overflow-hidden">
+        
+        {/* 本文エリア */}
+        <div 
+          className={`overflow-y-auto p-8 bg-white transition-all duration-300 ${
+            showDialog ? 'w-[60%]' : 'w-full'
+          }`}
         >
-          {book.content}
+          <div 
+            className={`leading-relaxed transition-all duration-300 ${
+              showDialog ? 'max-w-3xl' : 'max-w-4xl mx-auto'
+            }`}
+            style={{ fontSize: `${fontSize}px` }}
+            onMouseUp={handleTextSelection}
+          >
+            {book.content.split('\n').map((paragraph, index) => (
+              paragraph.trim() && (
+                <p key={index} className="mb-6 text-gray-800">
+                  {paragraph}
+                </p>
+              )
+            ))}
+          </div>
         </div>
-      </article>
+
+        {/* 右側ダイアログエリア */}
+        {showDialog && (
+          <div className="w-[40%] border-l bg-gray-50 overflow-hidden flex flex-col">
+            
+            {/* 翻訳ダイアログ */}
+            {showTranslationDialog && selectedWord && (
+              <div className="h-full overflow-y-auto animate-slideInRight">
+                {/* Medium風カード */}
+                <div className="p-6 h-full flex flex-col">
+                  <div className="bg-white rounded-3xl shadow-2xl p-8 flex-1 overflow-y-auto">
+                    <div className="flex justify-between items-start mb-6">
+                      <h2 className="text-3xl font-bold text-gray-900">📚 {selectedWord.word}</h2>
+                      <button
+                        onClick={closeTranslationDialog}
+                        className="text-gray-400 hover:text-gray-600 text-3xl font-bold w-10 h-10 flex items-center justify-center rounded-full hover:bg-gray-100 transition flex-shrink-0 ml-4"
+                      >
+                        ×
+                      </button>
+                    </div>
+                    
+                    {selectedWord.reading && (
+                      <p className="text-gray-500 mb-6 text-xl">({selectedWord.reading})</p>
+                    )}
+                    
+                    {selectedWord.old_meaning && (
+                      <div className="mb-6 p-6 bg-gradient-to-r from-blue-50 to-blue-100 rounded-2xl border-l-4 border-blue-500">
+                        <h4 className="font-bold text-blue-700 mb-3 text-lg flex items-center gap-2">
+                          📚 明治時代の意味
+                        </h4>
+                        <p className="text-gray-800 text-lg leading-relaxed">{selectedWord.old_meaning}</p>
+                      </div>
+                    )}
+                    
+                    {selectedWord.modern_meaning && (
+                      <div className="mb-6 p-6 bg-gradient-to-r from-green-50 to-green-100 rounded-2xl border-l-4 border-green-500">
+                        <h4 className="font-bold text-green-700 mb-3 text-lg flex items-center gap-2">
+                          📖 現代の意味
+                        </h4>
+                        <p className="text-gray-800 text-lg leading-relaxed">{selectedWord.modern_meaning}</p>
+                      </div>
+                    )}
+                    
+                    {selectedWord.example && (
+                      <div className="mb-6 p-6 bg-gradient-to-r from-purple-50 to-purple-100 rounded-2xl border-l-4 border-purple-500">
+                        <h4 className="font-bold text-purple-700 mb-3 text-lg flex items-center gap-2">
+                          💡 例文
+                        </h4>
+                        <p className="text-gray-800 text-lg italic leading-relaxed">「{selectedWord.example}」</p>
+                      </div>
+                    )}
+                    
+                    {selectedWord.notes && (
+                      <div className="text-sm text-gray-600 p-5 bg-gray-50 rounded-2xl border border-gray-200">
+                        <span className="font-semibold">ℹ️ 補足：</span> {selectedWord.notes}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* マップダイアログ */}
+            {showMapDialog && (
+              <div className="h-full overflow-y-auto animate-slideInRight">
+                <div className="p-6 h-full flex flex-col">
+                  <div className="bg-white rounded-3xl shadow-2xl p-8 flex-1 overflow-y-auto">
+                    <div className="flex justify-between items-start mb-6">
+                      <h2 className="text-3xl font-bold text-gray-900">🗺️ 物語の舞台</h2>
+                      <button
+                        onClick={closeMapDialog}
+                        className="text-gray-400 hover:text-gray-600 text-3xl font-bold w-10 h-10 flex items-center justify-center rounded-full hover:bg-gray-100 transition flex-shrink-0 ml-4"
+                      >
+                        ×
+                      </button>
+                    </div>
+                    
+                    {/* 場所検索 */}
+                    <div className="mb-6">
+                      <input
+                        type="text"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder="場所を検索..."
+                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:border-blue-500 text-lg"
+                      />
+                    </div>
+
+                    {locations.length > 0 ? (
+                      <>
+                        {/* Google Map */}
+                        <div 
+                          id="map" 
+                          className="w-full h-64 rounded-2xl overflow-hidden shadow-xl mb-6"
+                        />
+
+                        {/* 距離表示 */}
+                        {distance && locations.length > 1 && (
+                          <div className="mb-6 p-6 bg-gradient-to-r from-blue-50 to-blue-100 rounded-2xl border-l-4 border-blue-500">
+                            <h4 className="font-bold text-blue-700 mb-2 flex items-center gap-2 text-lg">
+                              📏 総距離
+                            </h4>
+                            <p className="text-3xl font-bold text-blue-900">{distance}</p>
+                            <p className="text-gray-600 mt-2">
+                              {locations[0].location_name} → {locations[locations.length - 1].location_name}
+                            </p>
+                          </div>
+                        )}
+
+                        {/* 場所リスト */}
+                        <div className="space-y-4">
+                          <h4 className="font-bold text-gray-900 text-xl mb-4">登場する場所：</h4>
+                          {locations.map((location, index) => (
+                            <div 
+                              key={location.id} 
+                              className="p-5 bg-gradient-to-r from-gray-50 to-gray-100 rounded-2xl hover:shadow-md transition cursor-pointer border border-gray-200"
+                            >
+                              <div className="flex items-center gap-3 mb-3">
+                                <span className="text-2xl">📍</span>
+                                <h3 className="font-bold text-gray-900 text-lg">
+                                  {index + 1}. {location.location_name}
+                                </h3>
+                              </div>
+                              {location.character_name && (
+                                <p className="text-blue-600 mb-2 ml-9 font-medium">
+                                  👤 {location.character_name}
+                                </p>
+                              )}
+                              <p className="text-gray-700 ml-9 leading-relaxed">{location.description}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    ) : (
+                      <div className="text-center py-12">
+                        <div className="text-6xl mb-4">🗺️</div>
+                        <p className="text-gray-500 text-lg">この本の場所情報はまだ登録されていません</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* アニメーション用CSS */}
+      <style jsx>{`
+        @keyframes slideInRight {
+          from {
+            transform: translateX(100%);
+            opacity: 0;
+          }
+          to {
+            transform: translateX(0);
+            opacity: 1;
+          }
+        }
+        .animate-slideInRight {
+          animation: slideInRight 0.3s ease-out;
+        }
+      `}</style>
     </div>
   );
 }

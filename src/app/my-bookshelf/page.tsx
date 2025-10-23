@@ -4,13 +4,14 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/app/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 
 interface Book {
   id: string;
   title: string;
   author: string;
   cover_url: string | null;
-  status: 'want_to_read' | 'reading' | 'read' | 'paused' | 'dropped';
+  status: 'want_to_read' | 'reading' | 'read' | 'paused';
   rating: number | null;
   memo: string | null;
   page_count: number | null;
@@ -18,6 +19,10 @@ interface Book {
   finished_date: string | null;
   tags: string[] | null;
   created_at: string;
+  // ✨ NEW
+  aozora_book_id: string | null;
+  preview_link: string | null;
+  buy_link: string | null;
 }
 
 export default function MyBookshelfPage() {
@@ -25,7 +30,7 @@ export default function MyBookshelfPage() {
   const router = useRouter();
   const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'want_to_read' | 'reading' | 'read' | 'dropped'>('want_to_read');
+  const [activeTab, setActiveTab] = useState<'want_to_read' | 'reading' | 'read'>('want_to_read');
   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -154,7 +159,6 @@ export default function MyBookshelfPage() {
       case 'reading': return 'bg-green-500';
       case 'read': return 'bg-purple-500';
       case 'paused': return 'bg-orange-500';
-      case 'dropped': return 'bg-red-500';
       default: return 'bg-blue-500';
     }
   };
@@ -190,7 +194,7 @@ export default function MyBookshelfPage() {
             </button>
           </div>
 
-          {/* ✨ タブ - 修正版 */}
+          {/* ✨ タブ - Droppedを削除 */}
           <div className="flex gap-3 mb-8">
             <button
               onClick={() => setActiveTab('want_to_read')}
@@ -236,7 +240,7 @@ export default function MyBookshelfPage() {
                   : 'text-gray-600 hover:bg-gray-100'
               }`}
             >
-              Finished ✅ 
+              Read ✅ 
               <span className={`px-2 py-0.5 rounded-full text-xs ${
                 activeTab === 'read'
                   ? 'bg-blue-600 text-white'
@@ -245,46 +249,27 @@ export default function MyBookshelfPage() {
                 {getBooksByStatus('read')}
               </span>
             </button>
-            
-            <button
-              onClick={() => setActiveTab('dropped')}
-              className={`px-6 py-3 rounded-xl font-semibold text-sm flex items-center gap-2 transition ${
-                activeTab === 'dropped'
-                  ? 'bg-blue-500 text-white'
-                  : 'text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-              Dropped ❌ 
-              <span className={`px-2 py-0.5 rounded-full text-xs ${
-                activeTab === 'dropped'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-200 text-gray-700'
-              }`}>
-                {getBooksByStatus('dropped')}
-              </span>
-            </button>
           </div>
 
           {/* 本のグリッド */}
           {filteredBooks.length === 0 ? (
             <div className="text-center py-20">
-              <p className="text-gray-500 text-lg mb-4">本がありません</p>
+              <div className="text-6xl mb-4">📚</div>
+              <p className="text-gray-500 text-lg mb-6">まだ本が追加されていません</p>
               <button
-                onClick={() => setShowAddModal(true)}
-                className="px-6 py-3 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition font-semibold"
+                onClick={() => router.push('/books')}
+                className="px-6 py-3 bg-blue-500 text-white rounded-xl hover:bg-blue-600"
               >
-                + 最初の本を追加
+                本を探す
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-3 gap-6">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
               {filteredBooks.map((book) => (
-                <div
-                  key={book.id}
-                  onClick={() => openBookDetails(book)}
-                  className="cursor-pointer transition hover:transform hover:-translate-y-2"
-                >
-                  <div className="relative">
+                <div key={book.id} className="group">
+                  <div 
+                    className="relative cursor-pointer mb-3"
+                  >
                     {book.cover_url ? (
                       <img
                         src={book.cover_url}
@@ -302,9 +287,67 @@ export default function MyBookshelfPage() {
                       </svg>
                     </div>
                   </div>
-                  <div className="mt-3">
-                    <h3 className="font-bold text-gray-900 text-lg truncate">{book.title}</h3>
-                    <p className="text-gray-500 text-sm truncate">{book.author}</p>
+
+                  {/* ✨ 本の情報とボタン */}
+                  <div className="space-y-2">
+                    <h3 className="font-bold text-gray-900 text-sm truncate">{book.title}</h3>
+                    <p className="text-gray-500 text-xs truncate">{book.author}</p>
+                    
+                    {/* ✨ 評価表示 */}
+                    {book.rating && (
+                      <div className="flex items-center gap-1">
+                        {[...Array(5)].map((_, i) => (
+                          <span key={i} className="text-yellow-400 text-sm">
+                            {i < book.rating! ? '⭐' : '☆'}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* ✨ アクションボタン */}
+                    <div className="space-y-1">
+                      {/* 青空文庫の本なら「読む」ボタン */}
+                      {book.aozora_book_id && (
+                        <Link
+                          href={`/reader/${book.aozora_book_id}`}
+                          className="block w-full px-2 py-1.5 bg-purple-500 text-white rounded-lg hover:bg-purple-600 text-center text-xs font-semibold transition"
+                        >
+                          📖 読む
+                        </Link>
+                      )}
+
+                      {/* Google Booksのプレビュー */}
+                      {book.preview_link && !book.aozora_book_id && (
+                        <a
+                          href={book.preview_link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="block w-full px-2 py-1.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-center text-xs font-semibold transition"
+                        >
+                          🔗 プレビュー
+                        </a>
+                      )}
+
+                      {/* 購入リンク */}
+                      {book.buy_link && (
+                        <a
+                          href={book.buy_link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="block w-full px-2 py-1.5 bg-green-500 text-white rounded-lg hover:bg-green-600 text-center text-xs font-semibold transition"
+                        >
+                          🛒 購入
+                        </a>
+                      )}
+
+                      {/* 詳細ボタン */}
+                      <button
+                        onClick={() => openBookDetails(book)}
+                        className="w-full px-2 py-1.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-center text-xs font-semibold transition"
+                      >
+                        📝 詳細
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -361,7 +404,6 @@ export default function MyBookshelfPage() {
                       <option value="reading">📖 読んでる</option>
                       <option value="read">✅ 読んだ</option>
                       <option value="paused">⏸️ 中断中</option>
-                      <option value="dropped">❌ やめた</option>
                     </select>
                   </div>
                 </div>
