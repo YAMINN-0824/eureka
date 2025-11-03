@@ -89,6 +89,7 @@ export default function ImprovedReaderPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [tempLocation, setTempLocation] = useState<any>(null); // 一時表示用
 
   useEffect(() => {
     if (id) {
@@ -121,7 +122,7 @@ export default function ImprovedReaderPage() {
     }
   };
 
-  // Nominatim APIで場所を検索
+  // Nominatim APIで場所を検索（一時表示のみ）
   const searchPlace = async () => {
     if (!searchQuery.trim()) return;
     
@@ -129,13 +130,29 @@ export default function ImprovedReaderPage() {
     
     try {
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchQuery)}&format=json&limit=5&accept-language=ja`
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchQuery)}&format=json&limit=1&accept-language=ja`
       );
       
       if (!response.ok) throw new Error('検索に失敗しました');
       
       const data = await response.json();
-      setSearchResults(data);
+      
+      if (data.length > 0) {
+        const location = data[0];
+        
+        // 写真を取得（非同期）
+        setTempLocation({ ...location, photoUrl: undefined });
+        
+        // Wikipedia写真を取得
+        const photoUrl = await fetchWikipediaPhoto(location.display_name);
+        
+        // 写真URLを更新
+        setTempLocation({ ...location, photoUrl });
+        
+        setSearchResults([]);
+      } else {
+        alert('場所が見つかりませんでした');
+      }
     } catch (error) {
       console.error('場所検索エラー:', error);
       alert('場所の検索に失敗しました');
@@ -144,40 +161,105 @@ export default function ImprovedReaderPage() {
     }
   };
 
-  // 場所をデータベースに追加
-  const addLocation = async (result: any) => {
+  // Wikipedia APIで写真を取得
+  const fetchWikipediaPhoto = async (locationName: string): Promise<string | null> => {
     try {
-      // Unsplashから写真を取得
-      const photoUrl = await fetchUnsplashPhoto(result.display_name);
+      // 場所名をクリーンアップ（「金龍山 浅草寺」→「浅草寺」）
+      const cleanName = locationName.split(/[,、]/)[0].trim();
+      
+      // Wikipedia検索
+      const searchResponse = await fetch(
+        `https://ja.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(cleanName)}&format=json&origin=*`
+      );
+      
+      if (!searchResponse.ok) return null;
+      
+      const searchData = await searchResponse.json();
+      
+      if (!searchData.query?.search || searchData.query.search.length === 0) {
+        return null;
+      }
+      
+      const pageTitle = searchData.query.search[0].title;
+      
+      // ページ情報と画像を取得
+      const pageResponse = await fetch(
+        `https://ja.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(pageTitle)}&prop=pageimages&format=json&pithumbsize=800&origin=*`
+      );
+      
+      if (!pageResponse.ok) return null;
+      
+      const pageData = await pageResponse.json();
+      const pages = pageData.query?.pages;
+      
+      if (!pages) return null;
+      
+      const page = Object.values(pages)[0] as any;
+      
+      return page.thumbnail?.source || null;
+    } catch (error) {
+      console.error('Wikipedia API エラー:', error);
+      return null;
+    }
+  };
+
+  // 場所をデータベースに保存
+  const saveLocation = async () => {
+    if (!tempLocation) return;
+
+    try {
+      // tempLocationに既に写真URLがある場合はそれを使用
+      const photoUrl = tempLocation.photoUrl || null;
 
       const { data, error } = await supabase
         .from('book_locations')
         .insert([
           {
             book_id: id,
-            location_name: result.display_name.split(',')[0], // 最初の部分だけ
-            latitude: parseFloat(result.lat),
-            longitude: parseFloat(result.lon),
-            description: result.display_name,
+            location_name: tempLocation.display_name.split(',')[0], // 最初の部分だけ
+            latitude: parseFloat(tempLocation.lat),
+            longitude: parseFloat(tempLocation.lon),
+            description: tempLocation.display_name,
             character_name: '',
             photo_url: photoUrl,
-            place_id: result.place_id,
+            place_id: tempLocation.place_id,
             order_index: locations.length
           }
         ]);
 
       if (error) throw error;
 
-      alert('場所を追加しました！');
+      alert('場所を保存しました！');
+      setTempLocation(null);
       setSearchQuery('');
-      setSearchResults([]);
       await loadLocations();
     } catch (error) {
-      console.error('場所追加エラー:', error);
-      alert('場所の追加に失敗しました');
+      console.error('場所保存エラー:', error);
+      alert('場所の保存に失敗しました');
     }
   };
 
+  // 場所を削除
+  const deleteLocation = async (locationId: string) => {
+    if (!confirm('この場所を削除しますか？')) return;
+
+    try {
+      const { error } = await supabase
+        .from('book_locations')
+        .delete()
+        .eq('id', locationId);
+
+      if (error) throw error;
+
+      alert('場所を削除しました！');
+      await loadLocations();
+    } catch (error) {
+      console.error('場所削除エラー:', error);
+      alert('場所の削除に失敗しました');
+    }
+  };
+
+  // 場所をデータベースに追加（旧関数 - 削除）
   const calculateDistance = () => {
     if (locations.length < 2) return;
 
@@ -452,42 +534,66 @@ export default function ImprovedReaderPage() {
                   </button>
                 </div>
 
-                {/* 検索結果 */}
-                {searchResults.length > 0 && (
-                  <div className="mt-4 space-y-3 max-h-60 overflow-y-auto">
-                    <h4 className="font-bold text-gray-700">検索結果：</h4>
-                    {searchResults.map((result, index) => (
-                      <div key={index} className="p-4 bg-blue-50 rounded-xl border border-blue-200">
-                        <div className="flex justify-between items-start gap-3">
-                          <div className="flex-1">
-                            <h5 className="font-bold text-gray-900 mb-1">
-                              {result.display_name.split(',')[0]}
-                            </h5>
-                            <p className="text-sm text-gray-600">
-                              {result.display_name}
-                            </p>
-                          </div>
-                          <button
-                            onClick={() => addLocation(result)}
-                            className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition text-sm font-medium whitespace-nowrap"
-                          >
-                            ➕ 追加
-                          </button>
-                        </div>
+                {/* 検索結果（写真付き、シンプル） */}
+                {tempLocation && (
+                  <div className="mt-4 bg-white rounded-2xl border border-gray-300 shadow-lg overflow-hidden">
+                    {/* Wikipedia写真（読み込み中） */}
+                    {tempLocation.photoUrl === undefined ? (
+                      <div className="w-full h-48 bg-gray-200 animate-pulse flex items-center justify-center">
+                        <span className="text-gray-400">📸 写真を読み込み中...</span>
                       </div>
-                    ))}
+                    ) : tempLocation.photoUrl ? (
+                      <img 
+                        src={tempLocation.photoUrl} 
+                        alt={tempLocation.display_name}
+                        className="w-full h-48 object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-48 bg-gradient-to-r from-blue-100 to-blue-200 flex items-center justify-center">
+                        <span className="text-4xl">📍</span>
+                      </div>
+                    )}
+                    
+                    <div className="p-5">
+                      <h5 className="font-bold text-gray-900 text-xl mb-2">
+                        {tempLocation.display_name.split(',')[0]}
+                      </h5>
+                      <p className="text-sm text-gray-600 mb-4">
+                        {tempLocation.display_name}
+                      </p>
+                      
+                      <div className="flex gap-2">
+                        <button
+                          onClick={saveLocation}
+                          className="flex-1 px-4 py-3 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition font-medium"
+                        >
+                          💾 保存
+                        </button>
+                        <button
+                          onClick={() => setTempLocation(null)}
+                          className="px-4 py-3 bg-gray-200 text-gray-700 rounded-xl hover:bg-gray-300 transition font-medium"
+                        >
+                          ✕ 閉じる
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
 
-              {locations.length > 0 ? (
+              {locations.length > 0 || tempLocation ? (
                 <>
                   {/* OpenStreetMap */}
-                  {typeof window !== 'undefined' && (
+                  {typeof window !== 'undefined' && (locations.length > 0 || tempLocation) && (
                     <div className="mb-6 rounded-2xl overflow-hidden shadow-xl h-64">
                       <MapContainer
-                        center={[locations[0].latitude, locations[0].longitude]}
-                        zoom={10}
+                        key={tempLocation ? `temp-${tempLocation.place_id}` : 'saved'}
+                        center={
+                          tempLocation 
+                            ? [parseFloat(tempLocation.lat), parseFloat(tempLocation.lon)]
+                            : [locations[0].latitude, locations[0].longitude]
+                        }
+                        zoom={tempLocation ? 15 : 10}
                         style={{ height: '100%', width: '100%' }}
                       >
                         <TileLayer
@@ -495,7 +601,7 @@ export default function ImprovedReaderPage() {
                           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
                         />
                         
-                        {/* マーカー */}
+                        {/* 保存済みマーカーのみ表示 */}
                         {locations.map((location, index) => (
                           <Marker
                             key={location.id}
@@ -503,7 +609,7 @@ export default function ImprovedReaderPage() {
                           >
                             <Popup>
                               <div className="p-2">
-                                <h3 className="font-bold">{location.location_name}</h3>
+                                <h3 className="font-bold">📍 {location.location_name}</h3>
                                 {location.character_name && (
                                   <p className="text-sm text-blue-600">👤 {location.character_name}</p>
                                 )}
@@ -541,11 +647,11 @@ export default function ImprovedReaderPage() {
 
                   {/* 場所リスト */}
                   <div className="space-y-4">
-                    <h4 className="font-bold text-gray-900 text-xl mb-4">登場する場所：</h4>
+                    <h4 className="font-bold text-gray-900 text-xl mb-4">保存された場所：</h4>
                     {locations.map((location, index) => (
                       <div 
                         key={location.id} 
-                        className="p-5 bg-gradient-to-r from-gray-50 to-gray-100 rounded-2xl hover:shadow-md transition cursor-pointer border border-gray-200"
+                        className="p-5 bg-gradient-to-r from-gray-50 to-gray-100 rounded-2xl hover:shadow-md transition border border-gray-200"
                       >
                         {/* 写真表示 */}
                         {location.photo_url && (
@@ -558,12 +664,21 @@ export default function ImprovedReaderPage() {
                           </div>
                         )}
                         
-                        <div className="flex items-center gap-3 mb-3">
-                          <span className="text-2xl">📍</span>
-                          <h3 className="font-bold text-gray-900 text-lg">
-                            {index + 1}. {location.location_name}
-                          </h3>
+                        <div className="flex items-start justify-between gap-3 mb-3">
+                          <div className="flex items-center gap-3">
+                            <span className="text-2xl">📍</span>
+                            <h3 className="font-bold text-gray-900 text-lg">
+                              {index + 1}. {location.location_name}
+                            </h3>
+                          </div>
+                          <button
+                            onClick={() => deleteLocation(location.id)}
+                            className="px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition text-sm font-medium whitespace-nowrap flex items-center gap-1"
+                          >
+                            🗑️ 削除
+                          </button>
                         </div>
+                        
                         {location.character_name && (
                           <p className="text-blue-600 mb-2 ml-9 font-medium">
                             👤 {location.character_name}
