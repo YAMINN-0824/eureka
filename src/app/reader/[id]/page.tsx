@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useParams, notFound } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/app/contexts/AuthContext';
 import dynamic from 'next/dynamic';
 
 // Leaflet を動的インポート（SSR対策）
@@ -56,21 +57,10 @@ interface Location {
   text_position?: number;
 }
 
-interface UnsplashPhoto {
-  id: string;
-  urls: {
-    regular: string;
-    small: string;
-  };
-  user: {
-    name: string;
-    username: string;
-  };
-}
-
 export default function ImprovedReaderPage() {
   const params = useParams();
   const { id } = params;
+  const { user } = useAuth();
 
   const [book, setBook] = useState<Book | null>(null);
   const [loading, setLoading] = useState(true);
@@ -97,30 +87,6 @@ export default function ImprovedReaderPage() {
       loadLocations();
     }
   }, [id]);
-
-  // Unsplash APIで写真を取得
-  const fetchUnsplashPhoto = async (locationName: string): Promise<string | null> => {
-    try {
-      const accessKey = process.env.NEXT_PUBLIC_UNSPLASH_ACCESS_KEY;
-      if (!accessKey) return null;
-
-      const response = await fetch(
-        `https://api.unsplash.com/search/photos?query=${encodeURIComponent(locationName)}&per_page=1&client_id=${accessKey}`
-      );
-      
-      if (!response.ok) return null;
-      
-      const data = await response.json();
-      if (data.results && data.results.length > 0) {
-        return data.results[0].urls.regular;
-      }
-      
-      return null;
-    } catch (error) {
-      console.error('Unsplash API エラー:', error);
-      return null;
-    }
-  };
 
   // Nominatim APIで場所を検索（一時表示のみ）
   const searchPlace = async () => {
@@ -365,6 +331,46 @@ export default function ImprovedReaderPage() {
     window.getSelection()?.removeAllRanges();
   };
 
+  // 単語を単語帳に保存
+  const saveWordToVocabulary = async () => {
+    if (!selectedWord || !user) {
+      alert('ログインが必要です');
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('user_vocabulary')
+        .insert([
+          {
+            user_id: user.id,
+            word: selectedWord.word,
+            reading: selectedWord.reading,
+            old_meaning: selectedWord.old_meaning,
+            modern_meaning: selectedWord.modern_meaning,
+            example: selectedWord.example,
+            notes: selectedWord.notes,
+            book_id: id,
+            book_title: book?.title
+          }
+        ]);
+
+      if (error) throw error;
+
+      alert('💾 単語を保存しました！');
+      closeTranslationDialog();
+    } catch (error: any) {
+      console.error('単語保存エラー:', error);
+      
+      // 重複エラーの場合
+      if (error.code === '23505') {
+        alert('この単語は既に保存されています');
+      } else {
+        alert('単語の保存に失敗しました');
+      }
+    }
+  };
+
   const openMapDialog = () => {
     setShowMapDialog(true);
     setShowTranslationDialog(false);
@@ -492,10 +498,18 @@ export default function ImprovedReaderPage() {
               )}
               
               {selectedWord.notes && (
-                <div className="text-sm text-gray-600 p-5 bg-gray-50 rounded-2xl border border-gray-200">
+                <div className="mb-6 text-sm text-gray-600 p-5 bg-gray-50 rounded-2xl border border-gray-200">
                   <span className="font-semibold">ℹ️ 補足：</span> {selectedWord.notes}
                 </div>
               )}
+
+              {/* 保存ボタン */}
+              <button
+                onClick={saveWordToVocabulary}
+                className="w-full px-6 py-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-2xl hover:from-blue-600 hover:to-blue-700 transition font-bold text-lg shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
+              >
+                💾 この単語を保存
+              </button>
             </div>
           </div>
         )}

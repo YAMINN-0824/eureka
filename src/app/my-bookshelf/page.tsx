@@ -36,6 +36,7 @@ export default function MyBookshelfPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [editBook, setEditBook] = useState<Book | null>(null);
   const [newTag, setNewTag] = useState('');
+  const [totalWords, setTotalWords] = useState(0); // 単語数
 
   useEffect(() => {
     if (!isLoggedIn) {
@@ -43,6 +44,7 @@ export default function MyBookshelfPage() {
       return;
     }
     loadBooks();
+    loadWordCount(); // 単語数を取得
   }, [isLoggedIn]);
 
   const loadBooks = async () => {
@@ -59,6 +61,20 @@ export default function MyBookshelfPage() {
       console.error('本の読み込みエラー:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadWordCount = async () => {
+    try {
+      const { count, error } = await supabase
+        .from('user_vocabulary')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user?.id);
+
+      if (error) throw error;
+      setTotalWords(count || 0);
+    } catch (error) {
+      console.error('単語数の取得エラー:', error);
     }
   };
 
@@ -178,20 +194,28 @@ export default function MyBookshelfPage() {
           
           {/* ヘッダー */}
           <div className="flex justify-between items-center mb-8">
-            <h1 className="text-4xl font-bold text-gray-900">Bookshelf</h1>
-            <button className="p-2 hover:bg-gray-100 rounded-lg transition">
-              <svg className="w-7 h-7 text-gray-400" viewBox="0 0 24 24" fill="currentColor">
-                <circle cx="5" cy="5" r="1.5"/>
-                <circle cx="12" cy="5" r="1.5"/>
-                <circle cx="19" cy="5" r="1.5"/>
-                <circle cx="5" cy="12" r="1.5"/>
-                <circle cx="12" cy="12" r="1.5"/>
-                <circle cx="19" cy="12" r="1.5"/>
-                <circle cx="5" cy="19" r="1.5"/>
-                <circle cx="12" cy="19" r="1.5"/>
-                <circle cx="19" cy="19" r="1.5"/>
-              </svg>
-            </button>
+            <div>
+              <h1 className="text-4xl font-bold text-gray-900 mb-2">私の本棚</h1>
+              <p className="text-gray-600">読書の記録を管理しましょう</p>
+            </div>
+            
+            {/* 単語帳ボタン */}
+            <Link
+              href="/vocabulary"
+              className="px-6 py-3 bg-gradient-to-r from-purple-500 to-blue-500 text-white rounded-xl hover:from-purple-600 hover:to-blue-600 transition shadow-lg hover:shadow-xl flex items-center gap-2 font-medium"
+            >
+              <span className="text-xl">📚</span>
+              <span>私の単語帳</span>
+              {totalWords > 0 && (
+                <span className={`px-2.5 py-1 rounded-full text-sm font-bold ${
+                  totalWords > 0
+                    ? 'bg-pink-300 text-gray-900'
+                    : 'bg-white bg-opacity-30 text-white'
+                }`}>
+                  {totalWords}
+                </span>
+              )}
+            </Link>
           </div>
 
           {/* ✨ タブ - Droppedを削除 */}
@@ -209,6 +233,7 @@ export default function MyBookshelfPage() {
                 activeTab === 'want_to_read'
                   ? 'bg-blue-600 text-white'
                   : 'bg-gray-200 text-gray-700'
+                  
               }`}>
                 {getBooksByStatus('want_to_read')}
               </span>
