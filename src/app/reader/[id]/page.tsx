@@ -290,12 +290,36 @@ export default function ImprovedReaderPage() {
   };
 
   // 言葉を選択したときの処理
+  // 単語検索履歴を記録
+  const recordWordLookup = async (word: string) => {
+    if (!user) return;
+
+    try {
+      await supabase
+        .from('word_lookup_history')
+        .insert([
+          {
+            user_id: user.id,
+            word: word,
+            book_id: id,
+            book_title: book?.title
+          }
+        ]);
+    } catch (error) {
+      console.error('履歴記録エラー:', error);
+      // エラーがあっても無視（ユーザー体験に影響しない）
+    }
+  };
+
   const handleTextSelection = async () => {
     const selection = window.getSelection();
     const selectedText = selection?.toString().trim();
 
     if (selectedText && selectedText.length > 0 && selectedText.length < 20) {
       console.log('選択された言葉:', selectedText);
+      
+      // 履歴を記録
+      await recordWordLookup(selectedText);
       
       // データベースから辞書を検索
       const { data, error } = await supabase
