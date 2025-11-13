@@ -235,26 +235,43 @@ export default function StoryPage() {
 
   const loadComments = async () => {
     try {
-      const { data, error } = await supabase
+      // まずコメントを取得
+      const { data: commentsData, error: commentsError } = await supabase
         .from('story_comments')
-        .select(`
-          *,
-          profiles!story_comments_user_id_fkey(username, avatar_url)
-        `)
+        .select('*')
         .eq('story_id', storyId)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (commentsError) {
+        console.error('コメント取得エラー:', commentsError);
+        return;
+      }
+
+      // 各コメントのユーザー情報を個別に取得
+      const commentsWithProfiles = await Promise.all(
+        (commentsData || []).map(async (comment) => {
+          const { data: profileData } = await supabase
+            .from('profiles')
+            .select('username, avatar_url')
+            .eq('user_id', comment.user_id)
+            .single();
+
+          return {
+            ...comment,
+            profiles: profileData || { username: '匿名', avatar_url: null }
+          };
+        })
+      );
 
       // コメントを親子関係で整理
-      const parentComments = (data || []).filter(c => !c.parent_comment_id);
+      const parentComments = commentsWithProfiles.filter(c => !c.parent_comment_id);
       const commentsWithReplies = parentComments.map(parent => ({
         ...parent,
-        replies: (data || []).filter(c => c.parent_comment_id === parent.id)
+        replies: commentsWithProfiles.filter(c => c.parent_comment_id === parent.id)
       }));
 
       setComments(commentsWithReplies);
-      setCommentCount(data?.length || 0);
+      setCommentCount(commentsData?.length || 0);
     } catch (error) {
       console.error('コメント読み込みエラー:', error);
     }
