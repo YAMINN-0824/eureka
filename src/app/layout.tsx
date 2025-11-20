@@ -1,18 +1,8 @@
 import type { Metadata } from "next";
-//import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import Header from "@/app/components/Header"
+import Header from "@/app/components/Header";
 import { AuthProvider } from "@/app/contexts/AuthContext";
-
-// const geistSans = Geist({
-//   variable: "--font-geist-sans",
-//   subsets: ["latin"],
-// });
-
-// const geistMono = Geist_Mono({
-//   variable: "--font-geist-mono",
-//   subsets: ["latin"],
-// });
+  import ToastProvider from "@/app/components/ToastProvider";
 
 export const metadata: Metadata = {
   title: "Eureka Library",
@@ -24,25 +14,13 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // return (
-  //   <html lang="ja">
-  //     <body
-  //       className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-  //     >
-  //       {children}
-  //     </body>
-  //   </html>
-  // );
-     return (
+  return (
     <html lang="ja">
       <body className="antialiased">
-        {/* ✨ AuthProviderで全体を囲む */}
         <AuthProvider>
-          {/* ✨ Headerを追加 */}
           <Header />
-          
-          {/* メインコンテンツ */}
           <main>{children}</main>
+          <ToastProvider />
         </AuthProvider>
       </body>
     </html>

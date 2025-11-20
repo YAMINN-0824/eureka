@@ -601,19 +601,21 @@ export default function StoryPage() {
                   {/* メインコメント */}
                   <div className="flex gap-4">
                     {/* アバター */}
-                    <Link href={`/author/${comment.user_id}`}>
-                      {comment.profiles?.avatar_url ? (
-                        <img
-                          src={comment.profiles.avatar_url}
-                          alt={comment.profiles.username}
-                          className="w-12 h-12 rounded-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center">
-                          <span className="text-xl">👤</span>
-                        </div>
-                      )}
-                    </Link>
+                    <div>
+                      <Link href={`/author/${comment.user_id}`}>
+                        {comment.profiles?.avatar_url ? (
+                          <img
+                            src={comment.profiles.avatar_url}
+                            alt={comment.profiles.username}
+                            className="w-12 h-12 rounded-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center">
+                            <span className="text-xl">👤</span>
+                          </div>
+                        )}
+                      </Link>
+                    </div>
 
                     {/* コメント内容 */}
                     <div className="flex-1">
@@ -698,19 +700,21 @@ export default function StoryPage() {
                           {comment.replies.map((reply: any) => (
                             <div key={reply.id} className="flex gap-3">
                               {/* 返信アバター */}
-                              <Link href={`/author/${reply.user_id}`}>
-                                {reply.profiles?.avatar_url ? (
-                                  <img
-                                    src={reply.profiles.avatar_url}
-                                    alt={reply.profiles.username}
-                                    className="w-10 h-10 rounded-full object-cover"
-                                  />
-                                ) : (
-                                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-400 to-blue-500 flex items-center justify-center">
-                                    <span className="text-lg">👤</span>
-                                  </div>
-                                )}
-                              </Link>
+                              <div>
+                                <Link href={`/author/${reply.user_id}`}>
+                                  {reply.profiles?.avatar_url ? (
+                                    <img
+                                      src={reply.profiles.avatar_url}
+                                      alt={reply.profiles.username}
+                                      className="w-10 h-10 rounded-full object-cover"
+                                    />
+                                  ) : (
+                                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-400 to-blue-500 flex items-center justify-center">
+                                      <span className="text-lg">👤</span>
+                                    </div>
+                                  )}
+                                </Link>
+                              </div>
 
                               {/* 返信内容 */}
                               <div className="flex-1">
