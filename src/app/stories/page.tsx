@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/app/contexts/AuthContext';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 interface Story {
   id: string;
@@ -21,6 +22,7 @@ interface Story {
 
 export default function StoriesPage() {
   const { user } = useAuth();
+  const router = useRouter();
   const [stories, setStories] = useState<Story[]>([]);
   const [filteredStories, setFilteredStories] = useState<Story[]>([]);
   const [loading, setLoading] = useState(true);
@@ -249,10 +251,10 @@ export default function StoriesPage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredStories.map((story) => (
-              <Link
+              <div
                 key={story.id}
-                href={`/story/${story.id}`}
-                className="bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all transform hover:-translate-y-1 overflow-hidden"
+                className="bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all transform hover:-translate-y-1 overflow-hidden cursor-pointer"
+                onClick={() => router.push(`/story/${story.id}`)}
               >
                 {/* カバー画像 */}
                 <div className="relative h-64 bg-gradient-to-br from-blue-400 to-purple-500">
@@ -286,14 +288,17 @@ export default function StoriesPage() {
                     {story.synopsis}
                   </p>
 
-                  {/* 作者 */}
-                  <Link
-                    href={`/author/${story.user_id}`}
-                    className="flex items-center gap-2 mb-3 text-sm text-gray-500 hover:text-blue-600 transition"
+                  {/* 作者 - クリックイベントで処理 */}
+                  <div
+                    onClick={(e) => {
+                      e.stopPropagation(); // 親のクリックイベントを止める
+                      router.push(`/author/${story.user_id}`);
+                    }}
+                    className="flex items-center gap-2 mb-3 text-sm text-gray-500 hover:text-blue-600 transition cursor-pointer"
                   >
                     <span>✍️</span>
                     <span className="font-medium">{story.author_name}</span>
-                  </Link>
+                  </div>
 
                   {/* 統計 */}
                   <div className="flex items-center justify-between text-sm">
@@ -318,7 +323,7 @@ export default function StoriesPage() {
                     {formatDate(story.created_at)}
                   </div>
                 </div>
-              </Link>
+              </div>
             ))}
           </div>
         )}

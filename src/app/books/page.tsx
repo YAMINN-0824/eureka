@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/app/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { motion } from 'framer-motion';
 
 interface Book {
   id: string;
@@ -22,7 +23,8 @@ interface Book {
 // カテゴリー別の本のデータ
 const BOOK_CATEGORIES = {
   popular: {
-    title: '🔥 人気の日本文学',
+    title: '🔥 Popular Japanese Literature',
+    subtitle: '人気の日本文学',
     books: [
       {
         id: 'pop-1',
@@ -69,19 +71,20 @@ const BOOK_CATEGORIES = {
         category: 'popular',
         isPublicDomain: false
       },
-      {
-        id: 'pop-6',
-        title: '伊豆の踊子',
-        author: '川端康成',
-        cover_url: 'https://m.media-amazon.com/images/I/61gtcnK18-L._AC_UL480_FMwebp_QL65_.jpg',
-        description: '旅芸人の踊子との淡い恋を描いた青春小説',
-        category: 'popular',
-        isPublicDomain: false
-      },
+      // {
+      //   id: 'pop-6',
+      //   title: '伊豆の踊子',
+      //   author: '川端康成',
+      //   cover_url: 'https://m.media-amazon.com/images/I/61gtcnK18-L._AC_UL480_FMwebp_QL65_.jpg',
+      //   description: '旅芸人の踊子との淡い恋を描いた青春小説',
+      //   category: 'popular',
+      //   isPublicDomain: false
+      // },
     ]
   },
   classics: {
-    title: '📚 日本文学の名作',
+    title: '📚 Classic Masterpieces',
+    subtitle: '日本文学の名作',
     books: [
       {
         id: 'cls-1',
@@ -128,19 +131,20 @@ const BOOK_CATEGORIES = {
         category: 'classics',
         isPublicDomain: false
       },
-      {
-        id: 'cls-6',
-        title: '山月記',
-        author: '中島敦',
-        cover_url: 'https://m.media-amazon.com/images/I/71oAje5bxYL._AC_UL480_FMwebp_QL65_.jpg',
-        description: '詩人が虎に変身する中国の伝説を基にした短編',
-        category: 'classics',
-        isPublicDomain: false
-      },
+      // {
+      //   id: 'cls-6',
+      //   title: '山月記',
+      //   author: '中島敦',
+      //   cover_url: 'https://m.media-amazon.com/images/I/71oAje5bxYL._AC_UL480_FMwebp_QL65_.jpg',
+      //   description: '詩人が虎に変身する中国の伝説を基にした短編',
+      //   category: 'classics',
+      //   isPublicDomain: false
+      // },
     ]
   },
   mystery: {
-    title: '🕵️ ミステリー・推理小説',
+    title: '🕵️ Mystery & Detective',
+    subtitle: 'ミステリー・推理小説',
     books: [
       {
         id: 'mys-1',
@@ -172,7 +176,8 @@ const BOOK_CATEGORIES = {
     ]
   },
   romance: {
-    title: '💖 恋愛・ロマンス',
+    title: '💖 Romance',
+    subtitle: '恋愛・ロマンス',
     books: [
       {
         id: 'rom-1',
@@ -204,7 +209,8 @@ const BOOK_CATEGORIES = {
     ]
   },
   scifi: {
-    title: '🚀 SF・ファンタジー',
+    title: '🚀 Sci-Fi & Fantasy',
+    subtitle: 'SF・ファンタジー',
     books: [
       {
         id: 'sf-1',
@@ -349,57 +355,47 @@ export default function BooksPage() {
     }
   };
 
-  // ✨ 修正：本棚に追加する時に追加情報も保存
-const addToBookshelf = async (book: Book, status: string) => {
-  if (!isLoggedIn) {
-    alert('ログインが必要です');
-    router.push('/login');
-    return;
-  }
-
-  try {
-    setAdding(book.id);
-
-    // ✨ デバッグ：送信するデータを確認
-    const bookData = {
-      user_id: user?.id,
-      title: book.title,
-      author: book.author,
-      cover_url: book.cover_url,
-      status: status,
-      aozora_book_id: book.isPublicDomain ? book.id : null,
-      preview_link: book.previewLink || null,
-      buy_link: book.buyLink || null,
-    };
-
-    console.log('📤 送信するデータ:', bookData);
-
-    const { data, error } = await supabase
-      .from('bookshelves')
-      .insert([bookData]);
-
-    if (error) {
-      console.error('❌ エラーの詳細:', error);
-      console.error('エラーコード:', error.code);
-      console.error('エラーメッセージ:', error.message);
-      console.error('エラー詳細:', error.details);
-      throw error;
+  const addToBookshelf = async (book: Book, status: string) => {
+    if (!isLoggedIn) {
+      alert('ログインしてください');
+      router.push('/login');
+      return;
     }
 
-    console.log('✅ 成功:', data);
-    alert(`「${book.title}」を本棚に追加しました！`);
-    setShowStatusModal(false);
-    setSelectedBook(null);
-  } catch (error) {
-    console.error('本棚への追加エラー:', error);
-    alert('本棚への追加に失敗しました');
-  } finally {
-    setAdding(null);
-  }
-};
+    try {
+      setAdding(book.id);
+
+      const bookData = {
+        user_id: user?.id,
+        title: book.title,
+        author: book.author,
+        cover_url: book.cover_url,
+        status: status,
+        aozora_book_id: book.isPublicDomain ? book.id : null,
+        preview_link: book.previewLink || null,
+        buy_link: book.buyLink || null,
+      };
+
+      const { data, error } = await supabase
+        .from('bookshelves')
+        .insert([bookData]);
+
+      if (error) throw error;
+
+      alert(`「${book.title}」を本棚に追加しました！`);
+      setShowStatusModal(false);
+      setSelectedBook(null);
+    } catch (error) {
+      console.error('本棚への追加エラー:', error);
+      alert('本棚への追加に失敗しました');
+    } finally {
+      setAdding(null);
+    }
+  };
+
   const openStatusModal = (book: Book) => {
     if (!isLoggedIn) {
-      alert('ログインが必要です');
+      alert('ログインしてください');
       router.push('/login');
       return;
     }
@@ -413,12 +409,12 @@ const addToBookshelf = async (book: Book, status: string) => {
     }
     
     const gradients = [
-      'from-blue-300 via-blue-400 to-blue-500',
-      'from-purple-300 via-purple-400 to-purple-500',
-      'from-pink-300 via-pink-400 to-pink-500',
+      'from-emerald-300 via-emerald-400 to-emerald-500',
       'from-green-300 via-green-400 to-green-500',
-      'from-orange-300 via-orange-400 to-orange-500',
-      'from-red-300 via-red-400 to-red-500'
+      'from-teal-300 via-teal-400 to-teal-500',
+      'from-lime-300 via-lime-400 to-lime-500',
+      'from-cyan-300 via-cyan-400 to-cyan-500',
+      'from-sky-300 via-sky-400 to-sky-500'
     ];
     
     const gradient = gradients[index % gradients.length];
@@ -431,222 +427,419 @@ const addToBookshelf = async (book: Book, status: string) => {
   };
 
   const BookCard = ({ book, index }: { book: Book; index: number }) => (
-    <div className="bg-white rounded-xl overflow-hidden shadow-md hover:shadow-xl transition hover:-translate-y-1">
-      <div className="aspect-[2/3] overflow-hidden">
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, delay: index * 0.05 }}
+      whileHover={{ y: -8, scale: 1.05 }}
+      onClick={() => setSelectedBook(book)}
+      className="bg-white rounded-3xl overflow-hidden shadow-lg hover:shadow-2xl transition-all cursor-pointer group"
+    >
+      {/* 本の表紙 - より大きく */}
+      <div className="aspect-[3/4] overflow-hidden relative">
         {getBookCover(book, index)}
-      </div>
-
-      <div className="p-4">
-        <h3 className="font-bold text-base text-gray-900 mb-1 line-clamp-1">{book.title}</h3>
-        <p className="text-sm text-gray-500 mb-2">{book.author}</p>
-        <p className="text-xs text-gray-600 mb-3 line-clamp-2">{book.description}</p>
         
+        {/* ホバー時のオーバーレイ */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-4">
+          <div className="text-white">
+            <p className="text-sm font-semibold">Click to see details</p>
+          </div>
+        </div>
+
+        {/* Free バッジ */}
         {book.isPublicDomain && (
-          <div className="mb-2">
-            <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded">
-              📖 無料で読める
+          <div className="absolute top-3 right-3">
+            <span className="bg-white/90 backdrop-blur-sm text-emerald-600 text-xs px-3 py-1.5 rounded-full font-bold shadow-lg">
+              ✨ FREE
             </span>
           </div>
         )}
 
+        {/* Price バッジ */}
         {book.price && (
-          <p className="text-sm font-bold text-blue-600 mb-2">
-            ¥{book.price.toLocaleString()}
-          </p>
+          <div className="absolute top-3 left-3">
+            <span className="bg-white/90 backdrop-blur-sm text-xs px-3 py-1.5 rounded-full font-bold shadow-lg" style={{ color: '#A0C878' }}>
+              ¥{book.price.toLocaleString()}
+            </span>
+          </div>
         )}
-        
-        <div className="space-y-2">
-          {book.isPublicDomain && (
-            <Link
-              href={`/reader/${book.id}`}
-              className="block w-full px-3 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 text-center text-sm font-semibold transition"
-            >
-              📖 読む
-            </Link>
-          )}
-          
-          <button
-            onClick={() => openStatusModal(book)}
-            disabled={adding === book.id}
-            className={`w-full px-3 py-2 rounded-lg text-sm font-semibold transition ${
-              adding === book.id
-                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                : 'bg-blue-500 text-white hover:bg-blue-600'
-            }`}
-          >
-            {adding === book.id ? '追加中...' : '📚 本棚に追加'}
-          </button>
-
-          {book.buyLink && (
-            <a
-              href={book.buyLink}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="block w-full px-3 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 text-center text-sm font-semibold transition"
-            >
-              🛒 購入
-            </a>
-          )}
-        </div>
       </div>
-    </div>
+
+      {/* タイトルと著者 - シンプルに */}
+      <div className="p-4">
+        <h3 className="font-bold text-base text-gray-900 mb-1 line-clamp-2 group-hover:text-[#A0C878] transition-colors">
+          {book.title}
+        </h3>
+        <p className="text-sm text-gray-600">{book.author}</p>
+      </div>
+    </motion.div>
   );
 
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.1,
+      },
+    },
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50 py-8">
       <div className="container mx-auto px-6 max-w-7xl">
         
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">📖 本を探す</h1>
-          <p className="text-gray-600">お気に入りの本を見つけて本棚に追加しましょう</p>
-        </div>
+        {/* ヘッダー */}
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="mb-10"
+        >
+          <h1 className="text-5xl font-bold mb-3 bg-gradient-to-r from-emerald-600 via-green-600 to-teal-600 bg-clip-text text-transparent">
+            Book Library
+          </h1>
+          <p className="text-xl text-gray-600">お気に入りの本を見つけよう</p>
+        </motion.div>
 
-        <div className="mb-8 flex gap-4">
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={handleSearchInputChange}
-            onKeyPress={handleKeyPress}
-            placeholder="🔍 本のタイトルや著者名で検索..."
-            className="flex-1 px-6 py-4 border-2 border-gray-200 rounded-2xl focus:outline-none focus:border-blue-500 transition text-lg"
-          />
-          <button
-            onClick={() => searchBooks()}
-            disabled={isSearching}
-            className="px-8 py-4 bg-blue-500 text-white rounded-2xl hover:bg-blue-600 transition font-semibold disabled:opacity-50"
-          >
-            {isSearching ? '検索中...' : '検索'}
-          </button>
-        </div>
+        {/* 検索バー */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.1 }}
+          className="mb-12"
+        >
+          <div className="flex gap-4">
+            <div className="relative flex-1">
+              <span className="absolute left-6 top-1/2 -translate-y-1/2 text-2xl">🔍</span>
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={handleSearchInputChange}
+                onKeyPress={handleKeyPress}
+                placeholder="Search books by title or author..."
+                className="w-full px-16 py-5 bg-white rounded-2xl focus:outline-none transition text-lg shadow-md border-2 focus:border-[#A0C878]"
+                style={{ 
+                  borderColor: '#e5e7eb',
+                }}
+              />
+            </div>
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => searchBooks()}
+              disabled={isSearching}
+              className="px-10 py-5 text-white rounded-2xl font-bold text-lg transition-all shadow-lg hover:shadow-xl disabled:opacity-50"
+              style={{
+                background: 'linear-gradient(135deg, #A0C878 0%, #7B9E5F 100%)',
+              }}
+            >
+              {isSearching ? '検索中...' : 'Search'}
+            </motion.button>
+          </div>
+        </motion.div>
 
         {isShowingSearchResults ? (
           <div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">
-              検索結果: 「{searchQuery}」 {totalResults}件
-            </h2>
+            <motion.h2
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="text-3xl font-bold text-gray-900 mb-8"
+            >
+              Search Results: 「{searchQuery}」 
+              <span className="text-xl text-gray-500 ml-3">{totalResults} books</span>
+            </motion.h2>
             
             {searchResults.length > 0 ? (
               <>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-8">
+                <motion.div
+                  variants={containerVariants}
+                  initial="hidden"
+                  animate="visible"
+                  className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6 mb-8"
+                >
                   {searchResults.map((book, index) => (
                     <BookCard key={book.id} book={book} index={index} />
                   ))}
-                </div>
+                </motion.div>
 
                 {searchResults.length < totalResults && (
                   <div className="text-center">
-                    <button
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
                       onClick={() => searchBooks(true)}
                       disabled={loadingMore}
-                      className="px-8 py-3 bg-gray-600 text-white rounded-xl hover:bg-gray-700 transition font-semibold disabled:opacity-50"
+                      className="px-10 py-4 bg-white text-lg rounded-2xl font-bold transition-all shadow-lg hover:shadow-xl disabled:opacity-50 border-2"
+                      style={{
+                        borderColor: '#A0C878',
+                        color: '#7B9E5F',
+                      }}
                     >
-                      {loadingMore ? '読み込み中...' : 'もっと読み込む'}
-                    </button>
+                      {loadingMore ? 'Loading...' : 'Load More'}
+                    </motion.button>
                   </div>
                 )}
               </>
             ) : (
               <div className="text-center py-20">
-                <p className="text-gray-500 text-lg">検索結果が見つかりませんでした</p>
+                <div className="text-6xl mb-4">📚</div>
+                <p className="text-gray-500 text-xl">No books found</p>
               </div>
             )}
           </div>
         ) : (
-          <div className="space-y-12">
+          <div className="space-y-16">
+            {/* 青空文庫 */}
             {aozoraBooks.length > 0 && (
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900 mb-6">
-                  📖 青空文庫 ({aozoraBooks.length}冊)
-                </h2>
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.2 }}
+              >
+                <div className="mb-8">
+                  <h2 className="text-3xl font-bold mb-2" style={{ color: '#7B9E5F' }}>
+                    📖 Aozora Bunko
+                  </h2>
+                  <p className="text-gray-600">青空文庫 - {aozoraBooks.length}冊の名作</p>
+                </div>
                 {loadingAozora ? (
                   <div className="text-center py-12">
-                    <p className="text-gray-600">読み込み中...</p>
+                    <div className="text-4xl mb-4">⏳</div>
+                    <p className="text-gray-600">Loading...</p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                  <motion.div
+                    variants={containerVariants}
+                    initial="hidden"
+                    animate="visible"
+                    className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6"
+                  >
                     {aozoraBooks.map((book, index) => (
                       <BookCard key={book.id} book={book} index={index} />
                     ))}
-                  </div>
+                  </motion.div>
                 )}
-              </div>
+              </motion.div>
             )}
 
-            {Object.entries(BOOK_CATEGORIES).map(([key, category]) => (
-              <div key={key}>
-                <h2 className="text-2xl font-bold text-gray-900 mb-6">
-                  {category.title} ({category.books.length}冊)
-                </h2>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+            {/* カテゴリー別 */}
+            {Object.entries(BOOK_CATEGORIES).map(([key, category], catIndex) => (
+              <motion.div
+                key={key}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.3 + catIndex * 0.1 }}
+              >
+                <div className="mb-8">
+                  <h2 className="text-3xl font-bold mb-2" style={{ color: '#7B9E5F' }}>
+                    {category.title}
+                  </h2>
+                  <p className="text-gray-600">{category.subtitle} - {category.books.length}冊</p>
+                </div>
+                <motion.div
+                  variants={containerVariants}
+                  initial="hidden"
+                  animate="visible"
+                  className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6"
+                >
                   {category.books.map((book, index) => (
                     <BookCard key={book.id} book={book} index={index} />
                   ))}
-                </div>
-              </div>
+                </motion.div>
+              </motion.div>
             ))}
           </div>
         )}
 
       </div>
 
-      {showStatusModal && selectedBook && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-8">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-8">
-            <h2 className="text-2xl font-bold mb-2">{selectedBook.title}</h2>
-            <p className="text-gray-500 mb-6">{selectedBook.author}</p>
+      {/* 本の詳細モーダル */}
+      {selectedBook && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-8"
+          onClick={() => setSelectedBook(null)}
+        >
+          <motion.div
+            initial={{ scale: 0.9, y: 20 }}
+            animate={{ scale: 1, y: 0 }}
+            className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* 本の情報 */}
+            <div className="p-8">
+              <div className="flex gap-6 mb-6">
+                {/* 表紙画像 */}
+                <div className="w-48 flex-shrink-0">
+                  <div className="aspect-[3/4] rounded-2xl overflow-hidden shadow-xl">
+                    {getBookCover(selectedBook, 0)}
+                  </div>
+                </div>
 
-            <h3 className="font-semibold text-gray-700 mb-4">読書状態を選択してください：</h3>
+                {/* 詳細情報 */}
+                <div className="flex-1">
+                  <h2 className="text-3xl font-bold mb-2 text-gray-900">{selectedBook.title}</h2>
+                  <p className="text-xl text-gray-600 mb-4">{selectedBook.author}</p>
+
+                  {/* バッジ */}
+                  <div className="flex gap-2 mb-4">
+                    {selectedBook.isPublicDomain && (
+                      <span className="bg-gradient-to-r from-emerald-100 to-green-100 text-emerald-700 text-sm px-4 py-2 rounded-full font-bold">
+                        ✨ Free to Read
+                      </span>
+                    )}
+                    {selectedBook.price && (
+                      <span className="text-2xl font-bold" style={{ color: '#A0C878' }}>
+                        ¥{selectedBook.price.toLocaleString()}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* 説明 */}
+                  <div className="mb-6">
+                    <h3 className="font-bold text-gray-900 mb-2">About this book:</h3>
+                    <p className="text-gray-700 leading-relaxed">{selectedBook.description}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* アクションボタン */}
+              <div className="space-y-3 border-t pt-6">
+                {selectedBook.isPublicDomain && (
+                  <Link
+                    href={`/reader/${selectedBook.id}`}
+                    className="block w-full px-6 py-4 text-white rounded-2xl text-center text-lg font-bold transition-all shadow-lg hover:shadow-xl"
+                    style={{
+                      background: 'linear-gradient(135deg, #A0C878 0%, #7B9E5F 100%)',
+                    }}
+                  >
+                    📖 Read Now
+                  </Link>
+                )}
+
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => setShowStatusModal(true)}
+                  disabled={adding === selectedBook.id}
+                  className={`w-full px-6 py-4 rounded-2xl text-lg font-bold transition-all shadow-lg ${
+                    adding === selectedBook.id
+                      ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                      : 'bg-white border-2 hover:bg-gray-50'
+                  }`}
+                  style={{
+                    borderColor: adding === selectedBook.id ? '#e5e7eb' : '#A0C878',
+                    color: adding === selectedBook.id ? '#6b7280' : '#7B9E5F',
+                  }}
+                >
+                  {adding === selectedBook.id ? '追加中...' : '📚 Add to My Library'}
+                </motion.button>
+
+                {selectedBook.buyLink && (
+                  <a
+                    href={selectedBook.buyLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block w-full px-6 py-4 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-2xl hover:from-amber-600 hover:to-orange-600 text-center text-lg font-bold transition-all shadow-lg"
+                  >
+                    🛒 Buy this Book
+                  </a>
+                )}
+
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => setSelectedBook(null)}
+                  className="w-full px-6 py-3 bg-gray-100 text-gray-700 rounded-2xl hover:bg-gray-200 font-semibold transition-all"
+                >
+                  Close
+                </motion.button>
+              </div>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+
+      {/* ステータス選択モーダル */}
+      {showStatusModal && selectedBook && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-8"
+          onClick={() => setShowStatusModal(false)}
+        >
+          <motion.div
+            initial={{ scale: 0.9, y: 20 }}
+            animate={{ scale: 1, y: 0 }}
+            className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-8"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-2xl font-bold mb-2 text-gray-900">{selectedBook.title}</h2>
+            <p className="text-gray-600 mb-6">Choose reading status:</p>
 
             <div className="space-y-3">
-              <button
-                onClick={() => addToBookshelf(selectedBook, 'want_to_read')}
-                className="w-full px-6 py-4 bg-blue-50 hover:bg-blue-100 border-2 border-blue-200 rounded-xl text-left transition flex items-center gap-3"
+              <motion.button
+                whileHover={{ scale: 1.02, x: 5 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => {
+                  addToBookshelf(selectedBook, 'want_to_read');
+                  setShowStatusModal(false);
+                }}
+                className="w-full px-6 py-4 bg-gradient-to-r from-blue-50 to-blue-100 hover:from-blue-100 hover:to-blue-200 border-2 border-blue-200 rounded-2xl text-left transition-all flex items-center gap-4"
               >
-                <span className="text-2xl">📚</span>
+                <span className="text-3xl">📚</span>
                 <div>
-                  <div className="font-semibold text-gray-900">読みたい</div>
-                  <div className="text-sm text-gray-500">後で読む予定の本</div>
+                  <div className="font-bold text-gray-900">Want to Read</div>
+                  <div className="text-sm text-gray-600">読みたい本</div>
                 </div>
-              </button>
+              </motion.button>
 
-              <button
-                onClick={() => addToBookshelf(selectedBook, 'reading')}
-                className="w-full px-6 py-4 bg-green-50 hover:bg-green-100 border-2 border-green-200 rounded-xl text-left transition flex items-center gap-3"
+              <motion.button
+                whileHover={{ scale: 1.02, x: 5 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => {
+                  addToBookshelf(selectedBook, 'reading');
+                  setShowStatusModal(false);
+                }}
+                className="w-full px-6 py-4 bg-gradient-to-r from-emerald-50 to-green-100 hover:from-emerald-100 hover:to-green-200 border-2 border-emerald-200 rounded-2xl text-left transition-all flex items-center gap-4"
               >
-                <span className="text-2xl">📖</span>
+                <span className="text-3xl">📖</span>
                 <div>
-                  <div className="font-semibold text-gray-900">読んでる</div>
-                  <div className="text-sm text-gray-500">今読んでいる本</div>
+                  <div className="font-bold text-gray-900">Currently Reading</div>
+                  <div className="text-sm text-gray-600">今読んでいる本</div>
                 </div>
-              </button>
+              </motion.button>
 
-              <button
-                onClick={() => addToBookshelf(selectedBook, 'read')}
-                className="w-full px-6 py-4 bg-purple-50 hover:bg-purple-100 border-2 border-purple-200 rounded-xl text-left transition flex items-center gap-3"
+              <motion.button
+                whileHover={{ scale: 1.02, x: 5 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => {
+                  addToBookshelf(selectedBook, 'read');
+                  setShowStatusModal(false);
+                }}
+                className="w-full px-6 py-4 bg-gradient-to-r from-purple-50 to-purple-100 hover:from-purple-100 hover:to-purple-200 border-2 border-purple-200 rounded-2xl text-left transition-all flex items-center gap-4"
               >
-                <span className="text-2xl">✅</span>
+                <span className="text-3xl">✅</span>
                 <div>
-                  <div className="font-semibold text-gray-900">読んだ</div>
-                  <div className="text-sm text-gray-500">読み終わった本</div>
+                  <div className="font-bold text-gray-900">Finished</div>
+                  <div className="text-sm text-gray-600">読み終わった本</div>
                 </div>
-              </button>
+              </motion.button>
             </div>
 
-            <button
-              onClick={() => {
-                setShowStatusModal(false);
-                setSelectedBook(null);
-              }}
-              className="w-full mt-6 px-6 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 font-medium transition"
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => setShowStatusModal(false)}
+              className="w-full mt-6 px-6 py-3 bg-gray-100 text-gray-700 rounded-2xl hover:bg-gray-200 font-semibold transition-all"
             >
-              キャンセル
-            </button>
-          </div>
-        </div>
+              Cancel
+            </motion.button>
+          </motion.div>
+        </motion.div>
       )}
     </div>
   );
 }
-
-
-

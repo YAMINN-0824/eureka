@@ -36,11 +36,12 @@ export default function Home() {
   } as const;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50 overflow-hidden">
       {/* 背景のアニメーション円 */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <motion.div
-          className="absolute top-20 left-10 w-72 h-72 bg-blue-200 rounded-full mix-blend-multiply filter blur-xl opacity-70"
+          className="absolute top-20 left-10 w-72 h-72 rounded-full mix-blend-multiply filter blur-xl opacity-60"
+          style={{ backgroundColor: '#A0C878' }}
           animate={{
             x: [0, 100, 0],
             y: [0, 50, 0],
@@ -52,7 +53,8 @@ export default function Home() {
           }}
         />
         <motion.div
-          className="absolute top-40 right-10 w-96 h-96 bg-purple-200 rounded-full mix-blend-multiply filter blur-xl opacity-70"
+          className="absolute top-40 right-10 w-96 h-96 rounded-full mix-blend-multiply filter blur-xl opacity-50"
+          style={{ backgroundColor: '#7B9E5F' }}
           animate={{
             x: [0, -100, 0],
             y: [0, 100, 0],
@@ -64,7 +66,8 @@ export default function Home() {
           }}
         />
         <motion.div
-          className="absolute -bottom-20 left-1/2 w-96 h-96 bg-pink-200 rounded-full mix-blend-multiply filter blur-xl opacity-70"
+          className="absolute -bottom-20 left-1/2 w-96 h-96 rounded-full mix-blend-multiply filter blur-xl opacity-40"
+          style={{ backgroundColor: '#B5D89A' }}
           animate={{
             x: [0, 50, 0],
             y: [0, -50, 0],
@@ -82,10 +85,10 @@ export default function Home() {
           variants={containerVariants}
           initial="hidden"
           animate={isVisible ? 'visible' : 'hidden'}
-          className="max-w-5xl mx-auto"
+          className="max-w-6xl mx-auto"
         >
           {/* メインタイトル */}
-          <motion.div variants={itemVariants} className="text-center mb-12">
+          <motion.div variants={itemVariants} className="text-center mb-16">
             <motion.div
               animate={{
                 y: [0, -10, 0],
@@ -99,57 +102,68 @@ export default function Home() {
             >
               📚
             </motion.div>
-            <h1 className="text-6xl font-bold mb-4 bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
+            <h1 className="text-7xl font-bold mb-6 bg-gradient-to-r from-emerald-600 via-green-600 to-teal-600 bg-clip-text text-transparent">
               Eureka
             </h1>
-            <p className="text-2xl text-gray-700 font-medium">
-              あなただけの読書体験を
+            <p className="text-2xl text-gray-700 font-medium mb-4">
+              Discover Your Reading Journey
+            </p>
+            <p className="text-lg text-gray-600">
+              あなたの読書の旅をもっと楽しく
             </p>
           </motion.div>
 
           {/* ボタン */}
           <motion.div
             variants={itemVariants}
-            className="flex justify-center gap-4 mb-20"
+            className="flex justify-center gap-6 mb-24"
           >
             <Link href="/books">
               <motion.button
-                whileHover={{ scale: 1.05 }}
+                whileHover={{ scale: 1.05, y: -5 }}
                 whileTap={{ scale: 0.95 }}
-                className="px-8 py-4 bg-gradient-to-r from-blue-600 to-blue-700 text-white text-lg font-bold rounded-2xl shadow-xl hover:shadow-2xl transition-shadow"
+                className="px-10 py-5 text-lg font-bold rounded-2xl shadow-2xl transition-all"
+                style={{
+                  background: 'linear-gradient(135deg, #A0C878 0%, #7B9E5F 100%)',
+                  color: 'white',
+                }}
               >
-                📖 本を探す
+                📖 Find Books
               </motion.button>
             </Link>
             <Link href="/stories">
               <motion.button
-                whileHover={{ scale: 1.05 }}
+                whileHover={{ scale: 1.05, y: -5 }}
                 whileTap={{ scale: 0.95 }}
-                className="px-8 py-4 bg-gradient-to-r from-purple-600 to-purple-700 text-white text-lg font-bold rounded-2xl shadow-xl hover:shadow-2xl transition-shadow"
+                className="px-10 py-5 bg-white text-lg font-bold rounded-2xl shadow-2xl transition-all border-2"
+                style={{
+                  borderColor: '#A0C878',
+                  color: '#7B9E5F',
+                }}
               >
-                ✍️ 作品を読む
+                ✍️ Read Stories
               </motion.button>
             </Link>
           </motion.div>
 
-          {/* 特徴カード - Pinterestスタイル */}
+          {/* 特徴カード - 3列 */}
           <motion.div
             variants={containerVariants}
-            className="grid md:grid-cols-3 gap-6"
+            className="grid md:grid-cols-3 gap-8 mb-12"
           >
             {/* カード1 */}
             <motion.div
               variants={itemVariants}
               whileHover={{
-                scale: 1.05,
+                scale: 1.08,
                 rotateZ: 2,
-                transition: { duration: 0.2 },
+                transition: { duration: 0.3 },
               }}
             >
               <Link href="/books">
-                <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-8 shadow-lg hover:shadow-2xl transition-shadow cursor-pointer border border-white/50">
+                <div className="bg-white/90 backdrop-blur-sm rounded-3xl p-8 shadow-xl hover:shadow-2xl transition-all cursor-pointer border-2 border-transparent hover:border-[#A0C878] h-full">
                   <motion.div
-                    className="text-6xl mb-4"
+                    className="text-6xl mb-6"
                     animate={{
                       rotate: [0, 5, -5, 0],
                     }}
@@ -161,13 +175,14 @@ export default function Home() {
                   >
                     📖
                   </motion.div>
-                  <h3 className="font-bold text-2xl mb-3 text-gray-900">
-                    青空文庫
+                  <h3 className="font-bold text-2xl mb-4" style={{ color: '#7B9E5F' }}>
+                    Classic Books
                   </h3>
-                  <p className="text-gray-600 leading-relaxed">
-                    名作文学を自由に読める
-                    <br />
-                    古語辞書で学習できる
+                  <p className="text-gray-600 leading-relaxed mb-3">
+                    青空文庫の名作を読もう
+                  </p>
+                  <p className="text-sm text-gray-500">
+                    日本の古い文学作品を自由に楽しめます
                   </p>
                 </div>
               </Link>
@@ -177,15 +192,15 @@ export default function Home() {
             <motion.div
               variants={itemVariants}
               whileHover={{
-                scale: 1.05,
+                scale: 1.08,
                 rotateZ: -2,
-                transition: { duration: 0.2 },
+                transition: { duration: 0.3 },
               }}
             >
               <Link href="/stories">
-                <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-8 shadow-lg hover:shadow-2xl transition-shadow cursor-pointer border border-white/50">
+                <div className="bg-white/90 backdrop-blur-sm rounded-3xl p-8 shadow-xl hover:shadow-2xl transition-all cursor-pointer border-2 border-transparent hover:border-[#A0C878] h-full">
                   <motion.div
-                    className="text-6xl mb-4"
+                    className="text-6xl mb-6"
                     animate={{
                       scale: [1, 1.1, 1],
                     }}
@@ -197,13 +212,14 @@ export default function Home() {
                   >
                     ✍️
                   </motion.div>
-                  <h3 className="font-bold text-2xl mb-3 text-gray-900">
-                    作品投稿
+                  <h3 className="font-bold text-2xl mb-4" style={{ color: '#7B9E5F' }}>
+                    Write & Share
                   </h3>
-                  <p className="text-gray-600 leading-relaxed">
-                    自分の作品を書いて公開
-                    <br />
-                    読者とつながる
+                  <p className="text-gray-600 leading-relaxed mb-3">
+                    自分の作品を書いて公開しよう
+                  </p>
+                  <p className="text-sm text-gray-500">
+                    誰でも作家になれる場所です
                   </p>
                 </div>
               </Link>
@@ -213,15 +229,15 @@ export default function Home() {
             <motion.div
               variants={itemVariants}
               whileHover={{
-                scale: 1.05,
+                scale: 1.08,
                 rotateZ: 2,
-                transition: { duration: 0.2 },
+                transition: { duration: 0.3 },
               }}
             >
               <Link href="/my-bookshelf">
-                <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-8 shadow-lg hover:shadow-2xl transition-shadow cursor-pointer border border-white/50">
+                <div className="bg-white/90 backdrop-blur-sm rounded-3xl p-8 shadow-xl hover:shadow-2xl transition-all cursor-pointer border-2 border-transparent hover:border-[#A0C878] h-full">
                   <motion.div
-                    className="text-6xl mb-4"
+                    className="text-6xl mb-6"
                     animate={{
                       rotate: [0, -5, 5, 0],
                     }}
@@ -233,13 +249,14 @@ export default function Home() {
                   >
                     📚
                   </motion.div>
-                  <h3 className="font-bold text-2xl mb-3 text-gray-900">
-                    マイページ
+                  <h3 className="font-bold text-2xl mb-4" style={{ color: '#7B9E5F' }}>
+                    My Library
                   </h3>
-                  <p className="text-gray-600 leading-relaxed">
-                    本棚、作品、単語帳
-                    <br />
-                    あなただけの空間
+                  <p className="text-gray-600 leading-relaxed mb-3">
+                    あなただけの本棚を作ろう
+                  </p>
+                  <p className="text-sm text-gray-500">
+                    読んだ本を記録して管理できます
                   </p>
                 </div>
               </Link>
@@ -249,86 +266,188 @@ export default function Home() {
           {/* 追加の特徴 - 2列グリッド */}
           <motion.div
             variants={containerVariants}
-            className="grid md:grid-cols-2 gap-6 mt-6"
+            className="grid md:grid-cols-2 gap-8 mb-20"
           >
             {/* カード4 */}
             <motion.div
               variants={itemVariants}
               whileHover={{
-                scale: 1.03,
+                scale: 1.05,
+                x: 10,
                 transition: { duration: 0.2 },
               }}
             >
-              <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-3xl p-6 shadow-md hover:shadow-xl transition-shadow border border-blue-200">
-                <div className="flex items-center gap-4">
-                  <motion.div
-                    className="text-5xl"
-                    animate={{
-                      y: [0, -5, 0],
-                    }}
-                    transition={{
-                      duration: 2.5,
-                      repeat: Infinity,
-                      ease: 'easeInOut' as const,
-                    }}
-                  >
-                    🗺️
-                  </motion.div>
-                  <div>
-                    <h3 className="font-bold text-xl mb-1 text-gray-900">
-                      物語の舞台マップ
-                    </h3>
-                    <p className="text-gray-600 text-sm">
-                      作品の舞台を地図で探索できる
-                    </p>
+              <Link href="/reader/1">
+                <div 
+                  className="rounded-3xl p-8 shadow-lg hover:shadow-2xl transition-all cursor-pointer"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(160, 200, 120, 0.1) 0%, rgba(123, 158, 95, 0.2) 100%)',
+                  }}
+                >
+                  <div className="flex items-center gap-6">
+                    <motion.div
+                      className="text-6xl"
+                      animate={{
+                        y: [0, -8, 0],
+                      }}
+                      transition={{
+                        duration: 2.5,
+                        repeat: Infinity,
+                        ease: 'easeInOut' as const,
+                      }}
+                    >
+                      🗺️
+                    </motion.div>
+                    <div>
+                      <h3 className="font-bold text-2xl mb-2" style={{ color: '#7B9E5F' }}>
+                        Story Map
+                      </h3>
+                      <p className="text-gray-600">
+                        物語の場所を地図で見つけよう
+                      </p>
+                      <p className="text-sm text-gray-500 mt-1">
+                        作品の舞台を実際の地図で探索できます
+                      </p>
+                    </div>
                   </div>
                 </div>
-              </div>
+              </Link>
             </motion.div>
 
             {/* カード5 */}
             <motion.div
               variants={itemVariants}
               whileHover={{
-                scale: 1.03,
+                scale: 1.05,
+                x: -10,
                 transition: { duration: 0.2 },
               }}
             >
-              <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-3xl p-6 shadow-md hover:shadow-xl transition-shadow border border-purple-200">
-                <div className="flex items-center gap-4">
-                  <motion.div
-                    className="text-5xl"
-                    animate={{
-                      rotate: [0, 10, -10, 0],
-                    }}
-                    transition={{
-                      duration: 3.5,
-                      repeat: Infinity,
-                      ease: 'easeInOut' as const,
-                    }}
-                  >
-                    💬
-                  </motion.div>
-                  <div>
-                    <h3 className="font-bold text-xl mb-1 text-gray-900">
-                      コメント機能
-                    </h3>
-                    <p className="text-gray-600 text-sm">
-                      作家と読者がつながる
-                    </p>
+              <Link href="/vocabulary">
+                <div 
+                  className="rounded-3xl p-8 shadow-lg hover:shadow-2xl transition-all cursor-pointer"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(160, 200, 120, 0.2) 0%, rgba(123, 158, 95, 0.1) 100%)',
+                  }}
+                >
+                  <div className="flex items-center gap-6">
+                    <motion.div
+                      className="text-6xl"
+                      animate={{
+                        rotate: [0, 10, -10, 0],
+                      }}
+                      transition={{
+                        duration: 3.5,
+                        repeat: Infinity,
+                        ease: 'easeInOut' as const,
+                      }}
+                    >
+                      📝
+                    </motion.div>
+                    <div>
+                      <h3 className="font-bold text-2xl mb-2" style={{ color: '#7B9E5F' }}>
+                        Word Collection
+                      </h3>
+                      <p className="text-gray-600">
+                        難しい言葉を集めて学ぼう
+                      </p>
+                      <p className="text-sm text-gray-500 mt-1">
+                        古い日本語を楽しく学習できます
+                      </p>
+                    </div>
                   </div>
                 </div>
-              </div>
+              </Link>
             </motion.div>
+          </motion.div>
+
+          {/* 統計セクション */}
+          <motion.div
+            variants={itemVariants}
+            className="bg-white/80 backdrop-blur-sm rounded-3xl p-12 shadow-xl border-2"
+            style={{ borderColor: '#A0C878' }}
+          >
+            <h2 className="text-3xl font-bold text-center mb-10" style={{ color: '#7B9E5F' }}>
+              Join Our Community
+            </h2>
+            <div className="grid md:grid-cols-3 gap-8">
+              <motion.div 
+                className="text-center"
+                whileHover={{ scale: 1.1 }}
+              >
+                <motion.div
+                  className="text-5xl font-bold mb-2"
+                  style={{ color: '#A0C878' }}
+                  animate={{
+                    scale: [1, 1.05, 1],
+                  }}
+                  transition={{
+                    duration: 2,
+                    repeat: Infinity,
+                  }}
+                >
+                  1000+
+                </motion.div>
+                <p className="text-gray-600 font-medium">Classic Books</p>
+                <p className="text-sm text-gray-500 mt-1">青空文庫の名作</p>
+              </motion.div>
+              
+              <motion.div 
+                className="text-center"
+                whileHover={{ scale: 1.1 }}
+              >
+                <motion.div
+                  className="text-5xl font-bold mb-2"
+                  style={{ color: '#A0C878' }}
+                  animate={{
+                    scale: [1, 1.05, 1],
+                  }}
+                  transition={{
+                    duration: 2,
+                    delay: 0.2,
+                    repeat: Infinity,
+                  }}
+                >
+                  500+
+                </motion.div>
+                <p className="text-gray-600 font-medium">User Stories</p>
+                <p className="text-sm text-gray-500 mt-1">みんなの作品</p>
+              </motion.div>
+              
+              <motion.div 
+                className="text-center"
+                whileHover={{ scale: 1.1 }}
+              >
+                <motion.div
+                  className="text-5xl font-bold mb-2"
+                  style={{ color: '#A0C878' }}
+                  animate={{
+                    scale: [1, 1.05, 1],
+                  }}
+                  transition={{
+                    duration: 2,
+                    delay: 0.4,
+                    repeat: Infinity,
+                  }}
+                >
+                  10K+
+                </motion.div>
+                <p className="text-gray-600 font-medium">Words Learned</p>
+                <p className="text-sm text-gray-500 mt-1">学んだ言葉</p>
+              </motion.div>
+            </div>
           </motion.div>
 
           {/* フッター */}
           <motion.div
             variants={itemVariants}
-            className="text-center mt-20 text-gray-500"
+            className="text-center mt-16 text-gray-500"
           >
             <p className="text-sm">
-              © 2025 Eureka - あなたの読書体験をもっと豊かに
+              © 2025 Eureka - Making Reading More Enjoyable
+            </p>
+            <p className="text-xs mt-1">
+              もっと楽しい読書体験を
             </p>
           </motion.div>
         </motion.div>
