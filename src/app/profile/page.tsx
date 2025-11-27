@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
-// import Header from '../components/Header';
+import { motion } from 'framer-motion';
+import Link from 'next/link';
 
 interface Profile {
   username: string;
@@ -35,7 +36,6 @@ export default function ProfilePage() {
 
   const loadProfile = async () => {
     try {
-      // ログイン確認
       const { data: { user } } = await supabase.auth.getUser();
       
       if (!user) {
@@ -43,7 +43,6 @@ export default function ProfilePage() {
         return;
       }
 
-      // プロフィール取得
       const { data: profileData, error } = await supabase
         .from('profiles')
         .select('*')
@@ -54,7 +53,6 @@ export default function ProfilePage() {
 
       setProfile(profileData);
 
-      // 読んだ本の数を取得
       const { count: readCount } = await supabase
         .from('bookshelves')
         .select('*', { count: 'exact', head: true })
@@ -63,7 +61,6 @@ export default function ProfilePage() {
 
       setBooksRead(readCount || 0);
 
-      // 読んでる本の数を取得
       const { count: readingCount } = await supabase
         .from('bookshelves')
         .select('*', { count: 'exact', head: true })
@@ -79,150 +76,201 @@ export default function ProfilePage() {
     }
   };
 
+  // ジャンル別の色を返す関数
+  const getGenreColor = (genreName: string) => {
+    const lower = genreName.toLowerCase();
+    if (lower.includes('恋愛') || lower.includes('ロマンス') || lower.includes('romance')) 
+      return 'linear-gradient(135deg, #ec4899 0%, #db2777 100%)'; // ピンク
+    if (lower.includes('ミステリー') || lower.includes('推理') || lower.includes('mystery')) 
+      return 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)'; // 紫
+    if (lower.includes('sf') || lower.includes('サイエンス') || lower.includes('science')) 
+      return 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)'; // 青
+    if (lower.includes('ファンタジー') || lower.includes('冒険') || lower.includes('fantasy')) 
+      return 'linear-gradient(135deg, #10b981 0%, #059669 100%)'; // 緑
+    if (lower.includes('歴史') || lower.includes('時代') || lower.includes('history')) 
+      return 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)'; // オレンジ
+    if (lower.includes('ホラー') || lower.includes('怖い') || lower.includes('horror')) 
+      return 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)'; // 赤
+    if (lower.includes('ビジネス') || lower.includes('自己啓発') || lower.includes('business')) 
+      return 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)'; // 黄色
+    if (lower.includes('青春') || lower.includes('学園') || lower.includes('youth')) 
+      return 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)'; // 水色
+    if (lower.includes('コメディ') || lower.includes('comedy')) 
+      return 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)'; // オレンジ赤
+    // デフォルト（小説、その他など）
+    return 'linear-gradient(135deg, #A0C878 0%, #7B9E5F 100%)'; // グリーン
+  };
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        {/* <Header /> */}
-        <div className="container mx-auto px-4 py-8">
-          <div className="text-center">読み込み中...</div>
-        </div>
+      <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50 flex items-center justify-center">
+        <div className="text-gray-600">Loading...</div>
       </div>
     );
   }
 
   if (!profile) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        {/* <Header /> */}
-        <div className="container mx-auto px-4 py-8">
-          <div className="text-center text-red-600">プロフィールが見つかりません</div>
+      <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-6xl mb-4">😕</div>
+          <p className="text-gray-600">プロフィールが見つかりません</p>
         </div>
       </div>
     );
   }
 
-  // アバターの生成
-  const avatarUrl = profile.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(profile.username)}&background=2563eb&color=fff&size=200`;
+  const avatarUrl = profile.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(profile.username)}&background=A0C878&color=fff&size=200`;
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* <Header /> */}
-
-      <div className="container mx-auto px-4 py-8 max-w-4xl">
+    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50">
+      <div className="container mx-auto px-6 py-8 max-w-6xl">
         
         {/* プロフィールヘッダー */}
-        <div className="bg-white rounded-lg shadow-lg p-8 mb-6">
-          <div className="flex flex-col md:flex-row gap-6">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white rounded-3xl shadow-xl p-10 mb-8"
+        >
+          <div className="flex flex-col md:flex-row gap-8">
             {/* プロフィール画像 */}
-            <div className="flex flex-col items-center">
-              <img 
-                src={avatarUrl}
-                alt={profile.username}
-                className="w-32 h-32 rounded-full"
-              />
+            <div className="flex-shrink-0">
+              <div className="w-40 h-40 rounded-full overflow-hidden shadow-2xl">
+                <img 
+                  src={avatarUrl}
+                  alt={profile.username}
+                  className="w-full h-full object-cover"
+                />
+              </div>
             </div>
 
             {/* 基本情報 */}
             <div className="flex-1">
-              <div className="flex items-center gap-3 mb-2">
-                <h2 className="text-3xl font-bold text-gray-900">{profile.username}</h2>
-                <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm">
+              <div className="flex items-center gap-4 mb-4">
+                <h2 className="text-4xl font-bold text-gray-900">{profile.username}</h2>
+                <span className="px-4 py-2 rounded-full text-sm font-bold text-white"
+                  style={{
+                    background: 'linear-gradient(135deg, #A0C878 0%, #7B9E5F 100%)',
+                  }}
+                >
                   📖 {profile.reading_level}
                 </span>
               </div>
               
               {profile.bio && (
-                <p className="text-gray-600 mb-4">{profile.bio}</p>
+                <p className="text-gray-700 mb-6 text-lg leading-relaxed">{profile.bio}</p>
               )}
 
               {/* 統計 */}
-              <div className="flex gap-6 mb-4">
-                <div>
-                  <div className="text-2xl font-bold text-blue-600">{booksRead}</div>
+              <div className="flex gap-8 mb-6">
+                <div className="text-center">
+                  <div className="text-4xl font-bold mb-1" style={{ color: '#A0C878' }}>
+                    {booksRead}
+                  </div>
                   <div className="text-sm text-gray-600">読んだ本</div>
                 </div>
-                <div>
-                  <div className="text-2xl font-bold text-green-600">{booksReading}</div>
+                <div className="text-center">
+                  <div className="text-4xl font-bold mb-1" style={{ color: '#A0C878' }}>
+                    {booksReading}
+                  </div>
                   <div className="text-sm text-gray-600">読んでる本</div>
                 </div>
               </div>
 
-              <div className="flex gap-3">
-                <button
-                  onClick={() => router.push('/profile/edit')}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                >
-                  プロフィール編集
-                </button>
-              </div>
+              <Link
+                href="/profile/edit"
+                className="inline-block px-8 py-3 text-white rounded-xl hover:shadow-xl transition-all font-bold"
+                style={{
+                  background: 'linear-gradient(135deg, #A0C878 0%, #7B9E5F 100%)',
+                }}
+              >
+                ✏️ Edit Profile
+              </Link>
             </div>
           </div>
-        </div>
+        </motion.div>
 
         <div className="grid md:grid-cols-3 gap-6">
           {/* 左カラム */}
           <div className="md:col-span-1 space-y-6">
             
             {/* 基本情報カード */}
-            <div className="bg-white rounded-lg shadow p-6">
-              <h3 className="text-lg font-bold text-gray-900 mb-4">👤 基本情報</h3>
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.1 }}
+              className="bg-white rounded-2xl shadow-lg p-6"
+            >
+              <h3 className="text-xl font-bold mb-4" style={{ color: '#7B9E5F' }}>
+                👤 Basic Info
+              </h3>
               
-              <div className="space-y-3 text-sm">
+              <div className="space-y-4 text-sm">
                 {profile.age_range && (
                   <div>
-                    <div className="text-gray-500">年齢層</div>
-                    <div className="font-medium">{profile.age_range}</div>
+                    <div className="text-gray-500 text-xs mb-1">年齢層</div>
+                    <div className="font-semibold text-gray-900">{profile.age_range}</div>
                   </div>
                 )}
                 
                 {profile.gender && (
                   <div>
-                    <div className="text-gray-500">性別</div>
-                    <div className="font-medium">{profile.gender}</div>
+                    <div className="text-gray-500 text-xs mb-1">性別</div>
+                    <div className="font-semibold text-gray-900">{profile.gender}</div>
                   </div>
                 )}
                 
                 {profile.location && (
                   <div>
-                    <div className="text-gray-500">地域</div>
-                    <div className="font-medium">{profile.location}</div>
+                    <div className="text-gray-500 text-xs mb-1">地域</div>
+                    <div className="font-semibold text-gray-900">{profile.location}</div>
                   </div>
                 )}
                 
                 <div>
-                  <div className="text-gray-500">登録日</div>
-                  <div className="font-medium">
+                  <div className="text-gray-500 text-xs mb-1">登録日</div>
+                  <div className="font-semibold text-gray-900">
                     {new Date(profile.created_at).toLocaleDateString('ja-JP', { year: 'numeric', month: 'long' })}
                   </div>
                 </div>
               </div>
-            </div>
+            </motion.div>
 
             {/* ソーシャルリンク */}
             {(profile.twitter_url || profile.instagram_url || profile.facebook_url) && (
-              <div className="bg-white rounded-lg shadow p-6">
-                <h3 className="text-lg font-bold text-gray-900 mb-4">🔗 ソーシャル</h3>
+              <motion.div
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.2 }}
+                className="bg-white rounded-2xl shadow-lg p-6"
+              >
+                <h3 className="text-xl font-bold mb-4" style={{ color: '#7B9E5F' }}>
+                  🔗 Social Links
+                </h3>
                 
                 <div className="space-y-3">
                   {profile.twitter_url && (
-                    <a href={profile.twitter_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-blue-600 hover:underline">
+                    <a href={profile.twitter_url} target="_blank" rel="noopener noreferrer" 
+                      className="flex items-center gap-2 text-blue-600 hover:text-blue-700 font-semibold transition">
                       🐦 Twitter
                     </a>
                   )}
                   
                   {profile.instagram_url && (
-                    <a href={profile.instagram_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-pink-600 hover:underline">
+                    <a href={profile.instagram_url} target="_blank" rel="noopener noreferrer" 
+                      className="flex items-center gap-2 text-pink-600 hover:text-pink-700 font-semibold transition">
                       📷 Instagram
                     </a>
                   )}
                   
                   {profile.facebook_url && (
-                    <a href={profile.facebook_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-blue-600 hover:underline">
+                    <a href={profile.facebook_url} target="_blank" rel="noopener noreferrer" 
+                      className="flex items-center gap-2 text-blue-600 hover:text-blue-700 font-semibold transition">
                       📘 Facebook
                     </a>
                   )}
                 </div>
-              </div>
+              </motion.div>
             )}
 
           </div>
@@ -230,137 +278,138 @@ export default function ProfilePage() {
           {/* 右カラム */}
           <div className="md:col-span-2 space-y-6">
                     
-          {/* 好きなジャンル */}
-          {profile.favorite_genres && profile.favorite_genres.length > 0 && (
-            <div className="bg-white rounded-lg shadow p-6">
-              <h3 className="text-lg font-bold text-gray-900 mb-4">📚 好きなジャンル</h3>
-              
-              <div className="flex flex-wrap gap-2">
-                {profile.favorite_genres.map((genre, index) => {
-                  // ジャンル名に基づいて色を決定
-                  const getColorClassForGenre = (genreName: string) => {
-                    const lowerGenre = genreName.toLowerCase();
-                    if (lowerGenre.includes('恋愛') || lowerGenre.includes('ロマンス')) 
-                      return 'bg-pink-100 text-pink-700';
-                    if (lowerGenre.includes('ミステリー') || lowerGenre.includes('推理')) 
-                      return 'bg-purple-100 text-purple-700';
-                    if (lowerGenre.includes('sf') || lowerGenre.includes('サイエンス')) 
-                      return 'bg-blue-100 text-blue-700';
-                    if (lowerGenre.includes('ファンタジー') || lowerGenre.includes('冒険')) 
-                      return 'bg-green-100 text-green-700';
-                    if (lowerGenre.includes('歴史') || lowerGenre.includes('時代')) 
-                      return 'bg-orange-100 text-orange-700';
-                    if (lowerGenre.includes('ホラー') || lowerGenre.includes('怖い')) 
-                      return 'bg-red-100 text-red-700';
-                    if (lowerGenre.includes('ビジネス') || lowerGenre.includes('自己啓発')) 
-                      return 'bg-yellow-100 text-yellow-700';
-                    // デフォルト
-                    return 'bg-gray-100 text-gray-700';
-                  };
-                  
-                  return (
-                    <span key={index} className={`px-4 py-2 rounded-full ${getColorClassForGenre(genre)}`}>
+            {/* 好きなジャンル - 色分け対応 */}
+            {profile.favorite_genres && profile.favorite_genres.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.1 }}
+                className="bg-white rounded-2xl shadow-lg p-6"
+              >
+                <h3 className="text-xl font-bold mb-4" style={{ color: '#7B9E5F' }}>
+                  📚 Favorite Genres
+                </h3>
+                
+                <div className="flex flex-wrap gap-3">
+                  {profile.favorite_genres.map((genre, index) => (
+                    <span 
+                      key={index} 
+                      className="px-4 py-2 rounded-full text-sm font-semibold text-white"
+                      style={{
+                        background: getGenreColor(genre)
+                      }}
+                    >
                       {genre}
                     </span>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
+                  ))}
+                </div>
+              </motion.div>
+            )}
 
             {/* 好きな著者 */}
             {profile.favorite_authors && profile.favorite_authors.length > 0 && (
-              <div className="bg-white rounded-lg shadow p-6">
-                <h3 className="text-lg font-bold text-gray-900 mb-4">✍️ 好きな著者</h3>
+              <motion.div
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.2 }}
+                className="bg-white rounded-2xl shadow-lg p-6"
+              >
+                <h3 className="text-xl font-bold mb-4" style={{ color: '#7B9E5F' }}>
+                  ✍️ Favorite Authors
+                </h3>
                 
-                <div className="flex flex-wrap gap-3">
+                <div className="flex flex-wrap gap-2">
                   {profile.favorite_authors.map((author, index) => (
-                    <span key={index} className="px-3 py-1 bg-gray-100 text-gray-700 rounded-lg text-sm">
+                    <span key={index} className="px-4 py-2 bg-gray-100 text-gray-700 rounded-xl text-sm font-medium">
                       {author}
                     </span>
                   ))}
                 </div>
-              </div>
+              </motion.div>
             )}
 
             {/* 読書目標 */}
             {profile.reading_goal > 0 && (
-              <div className="bg-white rounded-lg shadow p-6">
-                <h3 className="text-lg font-bold text-gray-900 mb-4">🎯 2025年の読書目標</h3>
+              <motion.div
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.3 }}
+                className="bg-white rounded-2xl shadow-lg p-6"
+              >
+                <h3 className="text-xl font-bold mb-4" style={{ color: '#7B9E5F' }}>
+                  🎯 Reading Goal 2025
+                </h3>
                 
-                <div className="mb-3">
-                  <div className="flex justify-between text-sm mb-2">
-                    <span className="text-gray-600">今年の目標：{profile.reading_goal}冊</span>
-                    <span className="font-bold text-blue-600">{booksRead} / {profile.reading_goal}冊</span>
+                <div className="mb-4">
+                  <div className="flex justify-between mb-3">
+                    <span className="text-gray-600 font-medium">今年の目標：{profile.reading_goal}冊</span>
+                    <span className="font-bold text-lg" style={{ color: '#A0C878' }}>
+                      {booksRead} / {profile.reading_goal}
+                    </span>
                   </div>
-                  <div className="w-full bg-gray-200 rounded-full h-3">
+                  <div className="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
                     <div 
-                      className="bg-gradient-to-r from-blue-500 to-purple-500 h-3 rounded-full transition-all"
-                      style={{ width: `${Math.min((booksRead / profile.reading_goal) * 100, 100)}%` }}
+                      className="h-4 rounded-full transition-all duration-500"
+                      style={{ 
+                        width: `${Math.min((booksRead / profile.reading_goal) * 100, 100)}%`,
+                        background: 'linear-gradient(135deg, #A0C878 0%, #7B9E5F 100%)'
+                      }}
                     ></div>
                   </div>
                 </div>
                 
-                <p className="text-sm text-gray-600">
+                <p className="text-sm font-semibold" style={{ color: '#7B9E5F' }}>
                   {booksRead >= profile.reading_goal 
                     ? '🎉 目標達成！おめでとうございます！'
                     : `💪 あと${profile.reading_goal - booksRead}冊で目標達成です！`
                   }
                 </p>
-              </div>
+              </motion.div>
             )}
 
-          {/* 読書統計 */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-lg font-bold text-gray-900 mb-4">📊 読書統計</h3>
-            
-            {profile.favorite_genres && profile.favorite_genres.length > 0 ? (
-              <div className="space-y-3">
-                {profile.favorite_genres.map((genre, index) => {
-                  // 各ジャンルのパーセンテージを計算（仮のデータ）
-                  const percentage = Math.max(10, 100 - (index * 15));
-                  
-                  // ジャンル名に基づいて色を決定
-                  const getColorForGenre = (genreName: string) => {
-                    const lowerGenre = genreName.toLowerCase();
-                    if (lowerGenre.includes('恋愛') || lowerGenre.includes('ロマンス')) return 'bg-pink-500';
-                    if (lowerGenre.includes('ミステリー') || lowerGenre.includes('推理')) return 'bg-purple-500';
-                    if (lowerGenre.includes('sf') || lowerGenre.includes('サイエンス')) return 'bg-blue-500';
-                    if (lowerGenre.includes('ファンタジー') || lowerGenre.includes('冒険')) return 'bg-green-500';
-                    if (lowerGenre.includes('歴史') || lowerGenre.includes('時代')) return 'bg-orange-500';
-                    if (lowerGenre.includes('ホラー') || lowerGenre.includes('怖い')) return 'bg-red-500';
-                    if (lowerGenre.includes('ビジネス') || lowerGenre.includes('自己啓発')) return 'bg-yellow-500';
-                    // デフォルト
-                    return 'bg-gray-500';
-                  };
-                  
-                  const color = getColorForGenre(genre);
-                  
-                  return (
-                    <div key={index}>
-                      <div className="flex justify-between text-sm mb-1">
-                        <span className="text-gray-600">{genre}</span>
-                        <span className="font-medium">{percentage}%</span>
+            {/* 読書統計 - 色分け対応 */}
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.4 }}
+              className="bg-white rounded-2xl shadow-lg p-6"
+            >
+              <h3 className="text-xl font-bold mb-6" style={{ color: '#7B9E5F' }}>
+                📊 Reading Statistics
+              </h3>
+              
+              {profile.favorite_genres && profile.favorite_genres.length > 0 ? (
+                <div className="space-y-4">
+                  {profile.favorite_genres.map((genre, index) => {
+                    const percentage = Math.max(10, 100 - (index * 15));
+                    
+                    return (
+                      <div key={index}>
+                        <div className="flex justify-between mb-2">
+                          <span className="text-gray-700 font-medium">{genre}</span>
+                          <span className="font-bold" style={{ color: '#A0C878' }}>{percentage}%</span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                          <div 
+                            className="h-3 rounded-full transition-all duration-500"
+                            style={{ 
+                              width: `${percentage}%`,
+                              background: getGenreColor(genre)
+                            }}
+                          ></div>
+                        </div>
                       </div>
-                      <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div 
-                          className={`${color} h-2 rounded-full transition-all`}
-                          style={{ width: `${percentage}%` }}
-                        ></div>
-                      </div>
-                    </div>
-                  );
-                })}
-                
-                <p className="text-xs text-gray-400 mt-4">
-                  ※ これは仮のデータです。将来的に実際の読書データから統計を表示します。
-                </p>
-              </div>
-            ) : (
-              <p className="text-gray-500 text-sm">好きなジャンルを設定すると、読書統計が表示されます</p>
-            )}
-          </div>
+                    );
+                  })}
+                  
+                  <p className="text-xs text-gray-400 mt-6">
+                    ※ これは仮のデータです。将来的に実際の読書データから統計を表示します。
+                  </p>
+                </div>
+              ) : (
+                <p className="text-gray-500">好きなジャンルを設定すると、読書統計が表示されます</p>
+              )}
+            </motion.div>
 
           </div>
         </div>

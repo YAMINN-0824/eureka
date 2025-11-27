@@ -5,6 +5,8 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/app/contexts/AuthContext';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { motion } from 'framer-motion';
+import toast from 'react-hot-toast';
 
 interface Chapter {
   id?: string;
@@ -50,7 +52,6 @@ export default function WritePage() {
     try {
       setLoading(true);
 
-      // 作品情報を取得
       const { data: storyData, error: storyError } = await supabase
         .from('user_stories')
         .select('*')
@@ -65,7 +66,6 @@ export default function WritePage() {
       setSynopsis(storyData.synopsis);
       setCoverImageUrl(storyData.cover_image_url || '');
 
-      // 章を取得
       const { data: chaptersData, error: chaptersError } = await supabase
         .from('story_chapters')
         .select('*')
@@ -79,7 +79,7 @@ export default function WritePage() {
       }
     } catch (error) {
       console.error('作品の読み込みエラー:', error);
-      alert('作品の読み込みに失敗しました');
+      toast.error('作品の読み込みに失敗しました');
     } finally {
       setLoading(false);
     }
@@ -97,13 +97,12 @@ export default function WritePage() {
 
   const deleteChapter = (index: number) => {
     if (chapters.length === 1) {
-      alert('最低1つの章が必要です');
+      toast.error('最低1つの章が必要です');
       return;
     }
     if (!confirm('この章を削除しますか？')) return;
 
     const newChapters = chapters.filter((_, i) => i !== index);
-    // 章番号を振り直す
     newChapters.forEach((ch, i) => {
       ch.chapter_number = i + 1;
     });
@@ -129,15 +128,15 @@ export default function WritePage() {
 
   const saveStory = async (status: 'draft' | 'published') => {
     if (!title.trim()) {
-      alert('タイトルを入力してください');
+      toast.error('タイトルを入力してください');
       return;
     }
     if (!synopsis.trim()) {
-      alert('あらすじを入力してください');
+      toast.error('あらすじを入力してください');
       return;
     }
     if (chapters.some(ch => !ch.content.trim())) {
-      alert('全ての章に内容を入力してください');
+      toast.error('全ての章に内容を入力してください');
       return;
     }
 
@@ -145,7 +144,6 @@ export default function WritePage() {
       setLoading(true);
 
       if (editId) {
-        // 既存作品を更新
         const { error: storyError } = await supabase
           .from('user_stories')
           .update({
@@ -160,13 +158,8 @@ export default function WritePage() {
 
         if (storyError) throw storyError;
 
-        // 既存の章を削除
-        await supabase
-          .from('story_chapters')
-          .delete()
-          .eq('story_id', editId);
+        await supabase.from('story_chapters').delete().eq('story_id', editId);
 
-        // 新しい章を追加
         const chaptersToInsert = chapters.map(ch => ({
           story_id: editId,
           chapter_number: ch.chapter_number,
@@ -180,11 +173,10 @@ export default function WritePage() {
 
         if (chaptersError) throw chaptersError;
 
-        alert(status === 'published' ? '公開しました！' : '下書きを保存しました！');
+        toast.success(status === 'published' ? '公開しました!' : '下書きを保存しました!');
         router.push('/my-stories');
 
       } else {
-        // 新規作品を作成
         const { data: storyData, error: storyError } = await supabase
           .from('user_stories')
           .insert({
@@ -200,7 +192,6 @@ export default function WritePage() {
 
         if (storyError) throw storyError;
 
-        // 章を追加
         const chaptersToInsert = chapters.map(ch => ({
           story_id: storyData.id,
           chapter_number: ch.chapter_number,
@@ -214,13 +205,13 @@ export default function WritePage() {
 
         if (chaptersError) throw chaptersError;
 
-        alert(status === 'published' ? '公開しました！' : '下書きを保存しました！');
+        toast.success(status === 'published' ? '公開しました!' : '下書きを保存しました!');
         router.push('/my-stories');
       }
 
     } catch (error) {
       console.error('保存エラー:', error);
-      alert('保存に失敗しました');
+      toast.error('保存に失敗しました');
     } finally {
       setLoading(false);
     }
@@ -228,188 +219,241 @@ export default function WritePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 flex items-center justify-center">
-        <div className="text-xl text-gray-600">読み込み中...</div>
+      <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50 flex items-center justify-center">
+        <div className="text-gray-600">Loading...</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
+    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50">
       {/* ヘッダー */}
-      <header className="bg-white border-b shadow-sm sticky top-0 z-10">
+      <header className="bg-white/80 backdrop-blur-sm border-b shadow-sm sticky top-0 z-10">
         <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <Link href="/my-stories" className="text-blue-600 hover:underline font-medium flex items-center gap-2">
+              <Link href="/my-stories" className="text-gray-600 hover:text-gray-900 font-medium flex items-center gap-2 transition">
                 <span>←</span>
-                <span>私の作品に戻る</span>
+                <span>Back</span>
               </Link>
-              <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                <span>✍️</span>
-                <span>{editId ? '作品を編集' : '新しい作品を書く'}</span>
+              <h1 className="text-2xl font-bold bg-gradient-to-r from-emerald-600 via-green-600 to-teal-600 bg-clip-text text-transparent">
+                {editId ? '✏️ Edit Story' : '✨ Write New Story'}
               </h1>
             </div>
-            <div className="flex gap-2">
-              <button
+            <div className="flex gap-3">
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
                 onClick={saveDraft}
                 disabled={loading}
-                className="px-6 py-3 bg-gray-500 text-white rounded-xl hover:bg-gray-600 transition font-medium disabled:opacity-50"
+                className="px-6 py-2.5 bg-gray-500 text-white rounded-xl hover:bg-gray-600 transition font-semibold disabled:opacity-50"
               >
-                📝 下書き保存
-              </button>
-              <button
+                📝 Save Draft
+              </motion.button>
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
                 onClick={publish}
                 disabled={loading}
-                className="px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-xl hover:from-blue-600 hover:to-purple-600 transition shadow-lg hover:shadow-xl font-medium disabled:opacity-50"
+                className="px-8 py-2.5 text-white rounded-xl hover:shadow-lg transition-all font-semibold disabled:opacity-50"
+                style={{
+                  background: 'linear-gradient(135deg, #A0C878 0%, #7B9E5F 100%)',
+                }}
               >
-                ✅ 公開する
-              </button>
+                ✅ Publish
+              </motion.button>
             </div>
           </div>
         </div>
       </header>
 
-      <div className="container mx-auto px-6 py-8 max-w-6xl">
+      <div className="container mx-auto px-6 py-8 max-w-5xl">
         
         {/* 作品情報 */}
-        <div className="bg-white rounded-2xl shadow-lg p-8 mb-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-6">📖 作品情報</h2>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white rounded-3xl shadow-lg p-8 mb-6"
+        >
+          <h2 className="text-2xl font-bold mb-6" style={{ color: '#7B9E5F' }}>
+            📖 Story Information
+          </h2>
           
-          <div className="space-y-4">
+          <div className="space-y-6">
             <div>
-              <label className="block text-sm font-bold text-gray-700 mb-2">
-                タイトル <span className="text-red-500">*</span>
+              <label className="block text-sm font-bold text-gray-700 mb-3">
+                Title <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="例: 春の物語"
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 text-lg"
+                placeholder="Enter your story title..."
+                className="w-full px-5 py-4 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-[#A0C878] text-lg transition-colors"
               />
             </div>
 
-            <div>
-              <label className="block text-sm font-bold text-gray-700 mb-2">
-                ジャンル <span className="text-red-500">*</span>
-              </label>
-              <select
-                value={genre}
-                onChange={(e) => setGenre(e.target.value)}
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 text-lg bg-white"
-              >
-                {genres.map(g => (
-                  <option key={g} value={g}>{g}</option>
-                ))}
-              </select>
+            <div className="grid grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-3">
+                  Genre <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={genre}
+                  onChange={(e) => setGenre(e.target.value)}
+                  className="w-full px-5 py-4 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-[#A0C878] text-lg bg-white transition-colors"
+                >
+                  {genres.map(g => (
+                    <option key={g} value={g}>{g}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-3">
+                  Cover Image URL (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={coverImageUrl}
+                  onChange={(e) => setCoverImageUrl(e.target.value)}
+                  placeholder="https://..."
+                  className="w-full px-5 py-4 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-[#A0C878] transition-colors"
+                />
+              </div>
             </div>
 
+            {coverImageUrl && (
+              <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-xl">
+                <img src={coverImageUrl} alt="Preview" className="w-20 h-28 object-cover rounded-lg shadow-md" />
+                <span className="text-sm text-gray-600">Cover Preview</span>
+              </div>
+            )}
+
             <div>
-              <label className="block text-sm font-bold text-gray-700 mb-2">
-                あらすじ <span className="text-red-500">*</span>
+              <label className="block text-sm font-bold text-gray-700 mb-3">
+                Synopsis <span className="text-red-500">*</span>
               </label>
               <textarea
                 value={synopsis}
                 onChange={(e) => setSynopsis(e.target.value)}
-                placeholder="この物語について簡単に説明してください..."
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 resize-none text-lg"
+                placeholder="Describe your story in a few sentences..."
+                className="w-full px-5 py-4 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-[#A0C878] resize-none text-lg transition-colors"
                 rows={4}
               />
-            </div>
-
-            <div>
-              <label className="block text-sm font-bold text-gray-700 mb-2">
-                表紙画像URL（オプション）
-              </label>
-              <input
-                type="text"
-                value={coverImageUrl}
-                onChange={(e) => setCoverImageUrl(e.target.value)}
-                placeholder="https://example.com/cover.jpg"
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500"
-              />
-              {coverImageUrl && (
-                <div className="mt-2">
-                  <img src={coverImageUrl} alt="プレビュー" className="w-32 h-48 object-cover rounded-lg shadow-md" />
-                </div>
-              )}
+              <div className="text-sm text-gray-500 mt-2">
+                {synopsis.length} characters
+              </div>
             </div>
           </div>
-        </div>
+        </motion.div>
 
         {/* 章の管理 */}
-        <div className="bg-white rounded-2xl shadow-lg p-8">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="bg-white rounded-3xl shadow-lg p-8"
+        >
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-bold text-gray-900">📝 章</h2>
-            <button
+            <h2 className="text-2xl font-bold" style={{ color: '#7B9E5F' }}>
+              📝 Chapters
+            </h2>
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
               onClick={addChapter}
-              className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition font-medium"
+              className="px-6 py-2.5 text-white rounded-xl hover:shadow-lg transition-all font-semibold"
+              style={{
+                background: 'linear-gradient(135deg, #A0C878 0%, #7B9E5F 100%)',
+              }}
             >
-              ➕ 章を追加
-            </button>
+              ➕ Add Chapter
+            </motion.button>
           </div>
 
           {/* 章のタブ */}
           <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
             {chapters.map((chapter, index) => (
-              <button
+              <motion.button
                 key={index}
+                whileHover={{ scale: 1.05, y: -2 }}
+                whileTap={{ scale: 0.95 }}
                 onClick={() => setActiveChapter(index)}
-                className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition ${
+                className={`px-5 py-2.5 rounded-xl font-semibold whitespace-nowrap transition-all ${
                   activeChapter === index
-                    ? 'bg-blue-500 text-white'
+                    ? 'text-white shadow-md'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
+                style={
+                  activeChapter === index
+                    ? { background: 'linear-gradient(135deg, #A0C878 0%, #7B9E5F 100%)' }
+                    : {}
+                }
               >
-                第{chapter.chapter_number}章
-              </button>
+                Chapter {chapter.chapter_number}
+              </motion.button>
             ))}
           </div>
 
           {/* 章の編集 */}
           {chapters[activeChapter] && (
-            <div className="space-y-4">
+            <motion.div
+              key={activeChapter}
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.3 }}
+              className="space-y-6"
+            >
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">
-                  章のタイトル
+                <label className="block text-sm font-bold text-gray-700 mb-3">
+                  Chapter Title
                 </label>
                 <input
                   type="text"
                   value={chapters[activeChapter].chapter_title}
                   onChange={(e) => updateChapter(activeChapter, 'chapter_title', e.target.value)}
-                  placeholder="例: 出会い"
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 text-lg"
+                  placeholder="Enter chapter title..."
+                  className="w-full px-5 py-4 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-[#A0C878] text-lg transition-colors"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">
-                  本文 <span className="text-red-500">*</span>
-                </label>
+                <div className="flex items-center justify-between mb-3">
+                  <label className="block text-sm font-bold text-gray-700">
+                    Content <span className="text-red-500">*</span>
+                  </label>
+                  <span className="text-sm font-semibold px-3 py-1 rounded-full"
+                    style={{ 
+                      background: 'linear-gradient(135deg, #A0C878 0%, #7B9E5F 100%)',
+                      color: 'white'
+                    }}
+                  >
+                    {chapters[activeChapter].content.length} characters
+                  </span>
+                </div>
                 <textarea
                   value={chapters[activeChapter].content}
                   onChange={(e) => updateChapter(activeChapter, 'content', e.target.value)}
-                  placeholder="物語を書いてください..."
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 resize-none font-serif text-lg leading-relaxed"
+                  placeholder="Write your story here..."
+                  className="w-full px-5 py-4 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-[#A0C878] resize-none font-serif text-lg leading-relaxed transition-colors"
                   rows={20}
                 />
-                <div className="text-sm text-gray-500 mt-2">
-                  {chapters[activeChapter].content.length}文字
-                </div>
               </div>
 
               {chapters.length > 1 && (
-                <button
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
                   onClick={() => deleteChapter(activeChapter)}
-                  className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition font-medium"
+                  className="px-6 py-3 bg-red-500 text-white rounded-xl hover:bg-red-600 transition-all font-semibold"
                 >
-                  🗑️ この章を削除
-                </button>
+                  🗑️ Delete Chapter
+                </motion.button>
               )}
-            </div>
+            </motion.div>
           )}
-        </div>
+        </motion.div>
 
       </div>
     </div>

@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/app/contexts/AuthContext';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { motion } from 'framer-motion';
 
 interface Story {
   id: string;
@@ -45,7 +46,6 @@ export default function StoriesPage() {
 
   const loadStories = async () => {
     try {
-      // 公開作品を取得
       const { data: storiesData, error: storiesError } = await supabase
         .from('user_stories')
         .select('*')
@@ -54,17 +54,14 @@ export default function StoriesPage() {
 
       if (storiesError) throw storiesError;
 
-      // 各作品の作者名と章数を取得
       const storiesWithDetails = await Promise.all(
         (storiesData || []).map(async (story) => {
-          // 作者名を取得
           const { data: profileData } = await supabase
             .from('profiles')
             .select('username')
             .eq('user_id', story.user_id)
             .single();
 
-          // 章数を取得
           const { count } = await supabase
             .from('story_chapters')
             .select('*', { count: 'exact', head: true })
@@ -89,12 +86,10 @@ export default function StoriesPage() {
   const filterAndSortStories = () => {
     let filtered = stories;
 
-    // ジャンルでフィルター
     if (selectedGenre !== '全て') {
       filtered = filtered.filter(s => s.genre === selectedGenre);
     }
 
-    // 検索クエリでフィルター
     if (searchQuery) {
       filtered = filtered.filter(s =>
         s.title.includes(searchQuery) ||
@@ -103,7 +98,6 @@ export default function StoriesPage() {
       );
     }
 
-    // ソート
     if (sortBy === 'latest') {
       filtered.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
     } else if (sortBy === 'popular') {
@@ -119,36 +113,41 @@ export default function StoriesPage() {
     const date = new Date(dateString);
     return date.toLocaleDateString('ja-JP', {
       year: 'numeric',
-      month: 'long',
+      month: 'short',
       day: 'numeric'
     });
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 flex items-center justify-center">
-        <div className="text-xl text-gray-600">読み込み中...</div>
+      <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50 flex items-center justify-center">
+        <div className="text-gray-600">Loading...</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
+    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50">
       {/* ヘッダー */}
-      <header className="bg-white border-b shadow-sm sticky top-0 z-10">
-        <div className="container mx-auto px-6 py-4">
+      <header className="bg-white/80 backdrop-blur-sm border-b shadow-sm sticky top-0 z-10">
+        <div className="container mx-auto px-6 py-5">
           <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-              <span>📝</span>
-              <span>作品を探す</span>
-            </h1>
+            <div>
+              <h1 className="text-3xl font-bold mb-1 bg-gradient-to-r from-emerald-600 via-green-600 to-teal-600 bg-clip-text text-transparent">
+                Discover Stories
+              </h1>
+              <p className="text-gray-600 text-sm">世界中の物語を探そう</p>
+            </div>
             {user && (
               <Link
                 href="/write"
-                className="px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-xl hover:from-blue-600 hover:to-purple-600 transition shadow-lg hover:shadow-xl flex items-center gap-2 font-medium"
+                className="px-8 py-3 text-white rounded-2xl hover:shadow-xl transition-all shadow-lg flex items-center gap-2 font-bold"
+                style={{
+                  background: 'linear-gradient(135deg, #A0C878 0%, #7B9E5F 100%)',
+                }}
               >
                 <span className="text-xl">✨</span>
-                <span>作品を書く</span>
+                <span>Write</span>
               </Link>
             )}
           </div>
@@ -157,49 +156,52 @@ export default function StoriesPage() {
 
       <div className="container mx-auto px-6 py-8 max-w-7xl">
         
-        {/* 統計 */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white rounded-2xl shadow-lg p-6 border-l-4 border-blue-500">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-4xl">📚</span>
-              <span className="text-3xl font-bold text-blue-600">{stories.length}</span>
+        {/* 統計カード */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8"
+        >
+          <div className="bg-white rounded-2xl shadow-md p-5">
+            <div className="text-3xl mb-2">📚</div>
+            <div className="text-3xl font-bold mb-1" style={{ color: '#A0C878' }}>
+              {stories.length}
             </div>
-            <div className="text-gray-600 font-medium">公開作品</div>
+            <div className="text-gray-600 text-sm font-medium">Stories</div>
           </div>
 
-          <div className="bg-white rounded-2xl shadow-lg p-6 border-l-4 border-green-500">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-4xl">✍️</span>
-              <span className="text-3xl font-bold text-green-600">
-                {new Set(stories.map(s => s.user_id)).size}
-              </span>
+          <div className="bg-white rounded-2xl shadow-md p-5">
+            <div className="text-3xl mb-2">✍️</div>
+            <div className="text-3xl font-bold mb-1" style={{ color: '#A0C878' }}>
+              {new Set(stories.map(s => s.user_id)).size}
             </div>
-            <div className="text-gray-600 font-medium">作家</div>
+            <div className="text-gray-600 text-sm font-medium">Authors</div>
           </div>
 
-          <div className="bg-white rounded-2xl shadow-lg p-6 border-l-4 border-purple-500">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-4xl">👁️</span>
-              <span className="text-3xl font-bold text-purple-600">
-                {stories.reduce((sum, s) => sum + s.view_count, 0)}
-              </span>
+          <div className="bg-white rounded-2xl shadow-md p-5">
+            <div className="text-3xl mb-2">📖</div>
+            <div className="text-3xl font-bold mb-1" style={{ color: '#A0C878' }}>
+              {stories.reduce((sum, s) => sum + (s.chapter_count || 0), 0)}
             </div>
-            <div className="text-gray-600 font-medium">総閲覧数</div>
+            <div className="text-gray-600 text-sm font-medium">Chapters</div>
           </div>
 
-          <div className="bg-white rounded-2xl shadow-lg p-6 border-l-4 border-pink-500">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-4xl">💖</span>
-              <span className="text-3xl font-bold text-pink-600">
-                {stories.reduce((sum, s) => sum + s.like_count, 0)}
-              </span>
+          <div className="bg-white rounded-2xl shadow-md p-5">
+            <div className="text-3xl mb-2">💖</div>
+            <div className="text-3xl font-bold mb-1" style={{ color: '#A0C878' }}>
+              {stories.reduce((sum, s) => sum + s.like_count, 0)}
             </div>
-            <div className="text-gray-600 font-medium">総いいね</div>
+            <div className="text-gray-600 text-sm font-medium">Likes</div>
           </div>
-        </div>
+        </motion.div>
 
         {/* 検索・フィルター */}
-        <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="bg-white rounded-2xl shadow-md p-6 mb-8"
+        >
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* 検索 */}
             <div className="relative">
@@ -208,8 +210,8 @@ export default function StoriesPage() {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="作品を検索..."
-                className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500"
+                placeholder="Search stories..."
+                className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-[#A0C878] transition-colors"
               />
             </div>
 
@@ -217,7 +219,7 @@ export default function StoriesPage() {
             <select
               value={selectedGenre}
               onChange={(e) => setSelectedGenre(e.target.value)}
-              className="px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 bg-white"
+              className="px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-[#A0C878] bg-white transition-colors"
             >
               {genres.map(g => (
                 <option key={g} value={g}>{g}</option>
@@ -228,36 +230,49 @@ export default function StoriesPage() {
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as any)}
-              className="px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 bg-white"
+              className="px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-[#A0C878] bg-white transition-colors"
             >
               <option value="latest">最新順</option>
               <option value="popular">人気順（閲覧数）</option>
               <option value="likes">いいね順</option>
             </select>
           </div>
-        </div>
+        </motion.div>
 
         {/* 作品一覧 */}
         {filteredStories.length === 0 ? (
-          <div className="bg-white rounded-2xl shadow-lg p-12 text-center">
-            <div className="text-6xl mb-4">📚</div>
-            <h3 className="text-xl font-bold text-gray-900 mb-2">作品が見つかりません</h3>
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white rounded-3xl shadow-lg p-16 text-center"
+          >
+            <div className="text-8xl mb-6">📚</div>
+            <h3 className="text-2xl font-bold text-gray-900 mb-3">No stories found</h3>
             <p className="text-gray-600">
               {searchQuery || selectedGenre !== '全て'
                 ? '検索条件を変更してみてください'
                 : 'まだ作品が投稿されていません'}
             </p>
-          </div>
+          </motion.div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredStories.map((story) => (
-              <div
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.2 }}
+            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+          >
+            {filteredStories.map((story, index) => (
+              <motion.div
                 key={story.id}
-                className="bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all transform hover:-translate-y-1 overflow-hidden cursor-pointer"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.05 }}
+                whileHover={{ y: -8, transition: { duration: 0.2 } }}
+                className="bg-white rounded-2xl shadow-md hover:shadow-2xl transition-all overflow-hidden cursor-pointer"
                 onClick={() => router.push(`/story/${story.id}`)}
               >
                 {/* カバー画像 */}
-                <div className="relative h-64 bg-gradient-to-br from-blue-400 to-purple-500">
+                <div className="relative h-56">
                   {story.cover_image_url ? (
                     <img
                       src={story.cover_image_url}
@@ -265,14 +280,14 @@ export default function StoriesPage() {
                       className="w-full h-full object-cover"
                     />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <span className="text-8xl">📖</span>
+                    <div className="w-full h-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center">
+                      <span className="text-7xl">📖</span>
                     </div>
                   )}
                   
                   {/* ジャンルバッジ */}
                   <div className="absolute top-3 right-3">
-                    <span className="px-3 py-1 bg-white bg-opacity-90 backdrop-blur-sm text-gray-900 rounded-full text-sm font-bold shadow-lg">
+                    <span className="px-3 py-1.5 bg-white/90 backdrop-blur-sm text-gray-900 rounded-full text-xs font-bold shadow-md">
                       {story.genre}
                     </span>
                   </div>
@@ -280,52 +295,53 @@ export default function StoriesPage() {
 
                 {/* 作品情報 */}
                 <div className="p-5">
-                  <h3 className="text-xl font-bold text-gray-900 mb-2 line-clamp-2">
+                  <h3 className="text-lg font-bold text-gray-900 mb-2 line-clamp-2">
                     {story.title}
                   </h3>
                   
-                  <p className="text-gray-600 text-sm mb-3 line-clamp-3">
+                  <p className="text-gray-600 text-sm mb-3 line-clamp-2">
                     {story.synopsis}
                   </p>
 
-                  {/* 作者 - クリックイベントで処理 */}
+                  {/* 作者 */}
                   <div
                     onClick={(e) => {
-                      e.stopPropagation(); // 親のクリックイベントを止める
+                      e.stopPropagation();
                       router.push(`/author/${story.user_id}`);
                     }}
-                    className="flex items-center gap-2 mb-3 text-sm text-gray-500 hover:text-blue-600 transition cursor-pointer"
+                    className="flex items-center gap-2 mb-3 text-sm hover:text-[#A0C878] transition-colors cursor-pointer"
+                    style={{ color: '#7B9E5F' }}
                   >
                     <span>✍️</span>
-                    <span className="font-medium">{story.author_name}</span>
+                    <span className="font-semibold">{story.author_name}</span>
                   </div>
 
                   {/* 統計 */}
-                  <div className="flex items-center justify-between text-sm">
-                    <div className="flex items-center gap-4">
+                  <div className="flex items-center justify-between text-sm border-t pt-3">
+                    <div className="flex items-center gap-3">
                       <div className="flex items-center gap-1">
                         <span>📖</span>
-                        <span className="font-medium">{story.chapter_count}章</span>
+                        <span className="font-semibold">{story.chapter_count}</span>
                       </div>
                       <div className="flex items-center gap-1">
                         <span>👁️</span>
-                        <span className="font-medium">{story.view_count}</span>
+                        <span className="font-semibold">{story.view_count}</span>
                       </div>
                       <div className="flex items-center gap-1">
                         <span>💖</span>
-                        <span className="font-medium">{story.like_count}</span>
+                        <span className="font-semibold">{story.like_count}</span>
                       </div>
                     </div>
                   </div>
 
                   {/* 公開日 */}
-                  <div className="text-xs text-gray-400 mt-3">
+                  <div className="text-xs text-gray-400 mt-2">
                     {formatDate(story.created_at)}
                   </div>
                 </div>
-              </div>
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
         )}
       </div>
     </div>

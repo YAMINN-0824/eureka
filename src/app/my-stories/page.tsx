@@ -3,8 +3,10 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/app/contexts/AuthContext';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { motion } from 'framer-motion';
+import toast from 'react-hot-toast';
 
 interface Story {
   id: string;
@@ -12,7 +14,7 @@ interface Story {
   genre: string;
   synopsis: string;
   cover_image_url: string | null;
-  status: 'draft' | 'published';
+  status: 'published' | 'draft';
   view_count: number;
   like_count: number;
   created_at: string;
@@ -25,6 +27,7 @@ export default function MyStoriesPage() {
   const router = useRouter();
   const [stories, setStories] = useState<Story[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<'all' | 'published' | 'draft'>('all');
 
   useEffect(() => {
     if (!isLoggedIn) {
@@ -36,50 +39,49 @@ export default function MyStoriesPage() {
 
   const loadStories = async () => {
     try {
-      const { data, error } = await supabase
+      const { data: storiesData, error: storiesError } = await supabase
         .from('user_stories')
         .select('*')
         .eq('user_id', user?.id)
         .order('updated_at', { ascending: false });
 
-      if (error) throw error;
+      if (storiesError) throw storiesError;
 
-      // 各作品の章数を取得
       const storiesWithChapters = await Promise.all(
-        (data || []).map(async (story) => {
+        (storiesData || []).map(async (story) => {
           const { count } = await supabase
             .from('story_chapters')
             .select('*', { count: 'exact', head: true })
             .eq('story_id', story.id);
 
-          return { ...story, chapter_count: count || 0 };
+          return {
+            ...story,
+            chapter_count: count || 0
+          };
         })
       );
 
       setStories(storiesWithChapters);
     } catch (error) {
       console.error('作品の読み込みエラー:', error);
+      toast.error('作品の読み込みに失敗しました');
     } finally {
       setLoading(false);
     }
   };
 
   const deleteStory = async (storyId: string) => {
-    if (!confirm('この作品を削除しますか？章も全て削除されます。')) return;
+    if (!confirm('本当にこの作品を削除しますか？')) return;
 
     try {
-      const { error } = await supabase
-        .from('user_stories')
-        .delete()
-        .eq('id', storyId);
-
+      await supabase.from('story_chapters').delete().eq('story_id', storyId);
+      const { error } = await supabase.from('user_stories').delete().eq('id', storyId);
       if (error) throw error;
-
-      alert('削除しました！');
+      toast.success('削除しました!');
       await loadStories();
     } catch (error) {
       console.error('削除エラー:', error);
-      alert('削除に失敗しました');
+      toast.error('削除に失敗しました');
     }
   };
 
@@ -93,12 +95,11 @@ export default function MyStoriesPage() {
         .eq('id', storyId);
 
       if (error) throw error;
-
-      alert(newStatus === 'published' ? '公開しました！' : '下書きに戻しました');
+      toast.success(newStatus === 'published' ? '公開しました!' : '下書きに戻しました');
       await loadStories();
     } catch (error) {
       console.error('更新エラー:', error);
-      alert('更新に失敗しました');
+      toast.error('更新に失敗しました');
     }
   };
 
@@ -106,35 +107,45 @@ export default function MyStoriesPage() {
     const date = new Date(dateString);
     return date.toLocaleDateString('ja-JP', {
       year: 'numeric',
-      month: 'long',
+      month: 'short',
       day: 'numeric'
     });
   };
 
+  const filteredStories = stories.filter(story => {
+    if (activeTab === 'all') return true;
+    return story.status === activeTab;
+  });
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 flex items-center justify-center">
-        <div className="text-xl text-gray-600">読み込み中...</div>
+      <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50 flex items-center justify-center">
+        <div className="text-gray-600">Loading...</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
+    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50">
       {/* ヘッダー */}
       <header className="bg-white border-b shadow-sm sticky top-0 z-10">
-        <div className="container mx-auto px-6 py-4">
+        <div className="container mx-auto px-6 py-6">
           <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-              <span>✍️</span>
-              <span>私の作品</span>
-            </h1>
+            <div>
+              <h1 className="text-3xl font-bold mb-1 bg-gradient-to-r from-emerald-600 via-green-600 to-teal-600 bg-clip-text text-transparent">
+                My Stories
+              </h1>
+              <p className="text-gray-600">あなたの作品を管理しよう</p>
+            </div>
             <Link
               href="/write"
-              className="px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-xl hover:from-blue-600 hover:to-purple-600 transition shadow-lg hover:shadow-xl flex items-center gap-2 font-medium"
+              className="px-8 py-3 text-white rounded-2xl hover:shadow-xl transition-all shadow-lg flex items-center gap-2 font-bold text-lg"
+              style={{
+                background: 'linear-gradient(135deg, #A0C878 0%, #7B9E5F 100%)',
+              }}
             >
               <span className="text-xl">✨</span>
-              <span>新しい作品を書く</span>
+              <span>New Story</span>
             </Link>
           </div>
         </div>
@@ -142,163 +153,234 @@ export default function MyStoriesPage() {
 
       <div className="container mx-auto px-6 py-8 max-w-6xl">
         
-        {/* 統計 */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white rounded-2xl shadow-lg p-6 border-l-4 border-blue-500">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-4xl">📚</span>
-              <span className="text-3xl font-bold text-blue-600">{stories.length}</span>
+        {/* 統計 + タブ */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white rounded-3xl shadow-lg p-8 mb-8"
+        >
+          {/* 統計 */}
+          <div className="grid grid-cols-3 gap-6 mb-6 pb-6 border-b">
+            <div className="text-center">
+              <div className="text-5xl font-bold mb-2" style={{ color: '#A0C878' }}>
+                {stories.length}
+              </div>
+              <div className="text-gray-600 font-medium">Total Stories</div>
             </div>
-            <div className="text-gray-600 font-medium">全作品</div>
-          </div>
-
-          <div className="bg-white rounded-2xl shadow-lg p-6 border-l-4 border-green-500">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-4xl">✅</span>
-              <span className="text-3xl font-bold text-green-600">
+            <div className="text-center">
+              <div className="text-5xl font-bold mb-2" style={{ color: '#A0C878' }}>
                 {stories.filter(s => s.status === 'published').length}
-              </span>
+              </div>
+              <div className="text-gray-600 font-medium">Published</div>
             </div>
-            <div className="text-gray-600 font-medium">公開中</div>
+            <div className="text-center">
+              <div className="text-5xl font-bold mb-2" style={{ color: '#A0C878' }}>
+                {stories.reduce((sum, s) => sum + s.like_count, 0)}
+              </div>
+              <div className="text-gray-600 font-medium">Total Likes</div>
+            </div>
           </div>
 
-          <div className="bg-white rounded-2xl shadow-lg p-6 border-l-4 border-orange-500">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-4xl">📝</span>
-              <span className="text-3xl font-bold text-orange-600">
-                {stories.filter(s => s.status === 'draft').length}
-              </span>
-            </div>
-            <div className="text-gray-600 font-medium">下書き</div>
+          {/* タブ */}
+          <div className="flex gap-3">
+            <button
+              onClick={() => setActiveTab('all')}
+              className={`px-6 py-3 rounded-xl font-semibold transition-all ${
+                activeTab === 'all'
+                  ? 'text-white shadow-md'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+              style={
+                activeTab === 'all'
+                  ? { background: 'linear-gradient(135deg, #A0C878 0%, #7B9E5F 100%)' }
+                  : {}
+              }
+            >
+              📚 All ({stories.length})
+            </button>
+            <button
+              onClick={() => setActiveTab('published')}
+              className={`px-6 py-3 rounded-xl font-semibold transition-all ${
+                activeTab === 'published'
+                  ? 'text-white shadow-md'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+              style={
+                activeTab === 'published'
+                  ? { background: 'linear-gradient(135deg, #A0C878 0%, #7B9E5F 100%)' }
+                  : {}
+              }
+            >
+              ✅ Published ({stories.filter(s => s.status === 'published').length})
+            </button>
+            <button
+              onClick={() => setActiveTab('draft')}
+              className={`px-6 py-3 rounded-xl font-semibold transition-all ${
+                activeTab === 'draft'
+                  ? 'text-white shadow-md'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+              style={
+                activeTab === 'draft'
+                  ? { background: 'linear-gradient(135deg, #A0C878 0%, #7B9E5F 100%)' }
+                  : {}
+              }
+            >
+              📝 Drafts ({stories.filter(s => s.status === 'draft').length})
+            </button>
           </div>
-
-          <div className="bg-white rounded-2xl shadow-lg p-6 border-l-4 border-purple-500">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-4xl">👁️</span>
-              <span className="text-3xl font-bold text-purple-600">
-                {stories.reduce((sum, s) => sum + s.view_count, 0)}
-              </span>
-            </div>
-            <div className="text-gray-600 font-medium">総閲覧数</div>
-          </div>
-        </div>
+        </motion.div>
 
         {/* 作品一覧 */}
-        {stories.length === 0 ? (
-          <div className="bg-white rounded-2xl shadow-lg p-12 text-center">
-            <div className="text-6xl mb-4">✍️</div>
-            <h3 className="text-xl font-bold text-gray-900 mb-2">まだ作品がありません</h3>
-            <p className="text-gray-600 mb-6">
-              あなたの物語を書き始めましょう！
+        {filteredStories.length === 0 ? (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white rounded-3xl shadow-lg p-16 text-center"
+          >
+            <div className="text-8xl mb-6">✍️</div>
+            <h3 className="text-2xl font-bold text-gray-900 mb-3">
+              {activeTab === 'all' ? 'No stories yet' : 
+               activeTab === 'published' ? 'No published stories' : 
+               'No drafts'}
+            </h3>
+            <p className="text-gray-600 mb-8 text-lg">
+              {activeTab === 'all' ? 'あなたの物語を書き始めましょう!' : 
+               activeTab === 'published' ? '作品を公開してみましょう!' : 
+               '新しい作品を書き始めましょう!'}
             </p>
             <Link
               href="/write"
-              className="inline-block px-6 py-3 bg-blue-500 text-white rounded-xl hover:bg-blue-600 font-medium"
+              className="inline-block px-10 py-4 text-white rounded-2xl hover:shadow-xl transition-all shadow-lg font-bold text-lg"
+              style={{
+                background: 'linear-gradient(135deg, #A0C878 0%, #7B9E5F 100%)',
+              }}
             >
-              新しい作品を書く
+              Start Writing
             </Link>
-          </div>
+          </motion.div>
         ) : (
-          <div className="grid grid-cols-1 gap-6">
-            {stories.map((story) => (
-              <div 
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.1 }}
+            className="space-y-4"
+          >
+            {filteredStories.map((story, index) => (
+              <motion.div
                 key={story.id}
-                className="bg-white rounded-2xl shadow-lg hover:shadow-xl transition p-6"
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: index * 0.05 }}
+                className="bg-white rounded-2xl shadow-md hover:shadow-xl transition-all overflow-hidden"
               >
-                <div className="flex gap-6">
+                <div className="flex gap-6 p-6">
                   {/* カバー画像 */}
                   <div className="flex-shrink-0">
-                    {story.cover_image_url ? (
-                      <img
-                        src={story.cover_image_url}
-                        alt={story.title}
-                        className="w-32 h-48 object-cover rounded-xl shadow-md"
-                      />
-                    ) : (
-                      <div className="w-32 h-48 bg-gradient-to-br from-blue-400 to-purple-500 rounded-xl shadow-md flex items-center justify-center">
-                        <span className="text-5xl">📖</span>
-                      </div>
-                    )}
+                    <div className="w-32 h-44 rounded-xl overflow-hidden shadow-lg">
+                      {story.cover_image_url ? (
+                        <img
+                          src={story.cover_image_url}
+                          alt={story.title}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center">
+                          <span className="text-5xl">📖</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   {/* 作品情報 */}
-                  <div className="flex-1">
+                  <div className="flex-1 flex flex-col">
+                    {/* タイトルとステータス */}
                     <div className="flex items-start justify-between mb-3">
-                      <div>
-                        <div className="flex items-center gap-3 mb-2">
-                          <h3 className="text-2xl font-bold text-gray-900">{story.title}</h3>
+                      <div className="flex-1">
+                        <h3 className="text-2xl font-bold text-gray-900 mb-2">{story.title}</h3>
+                        <div className="flex items-center gap-3">
+                          <span className="px-3 py-1 rounded-full text-sm font-bold text-white"
+                            style={{
+                              background: 'linear-gradient(135deg, #A0C878 0%, #7B9E5F 100%)',
+                            }}
+                          >
+                            {story.genre}
+                          </span>
                           {story.status === 'published' ? (
                             <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-bold">
-                              ✅ 公開中
+                              ✅ Published
                             </span>
                           ) : (
                             <span className="px-3 py-1 bg-orange-100 text-orange-700 rounded-full text-sm font-bold">
-                              📝 下書き
+                              📝 Draft
                             </span>
                           )}
-                        </div>
-                        <div className="flex items-center gap-4 text-sm text-gray-500 mb-3">
-                          <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-lg font-medium">
-                            {story.genre}
-                          </span>
-                          <span>📅 {formatDate(story.updated_at)}</span>
-                          <span>📖 {story.chapter_count}章</span>
                         </div>
                       </div>
                     </div>
 
-                    <p className="text-gray-700 mb-4 line-clamp-2">{story.synopsis}</p>
+                    {/* あらすじ */}
+                    <p className="text-gray-600 mb-4 line-clamp-2 leading-relaxed">
+                      {story.synopsis}
+                    </p>
 
                     {/* 統計 */}
                     <div className="flex items-center gap-6 mb-4">
                       <div className="flex items-center gap-2">
-                        <span className="text-gray-500">👁️</span>
-                        <span className="font-bold text-gray-900">{story.view_count}</span>
-                        <span className="text-gray-500 text-sm">閲覧</span>
+                        <span className="text-xl">📖</span>
+                        <span className="font-bold text-gray-900">{story.chapter_count}</span>
+                        <span className="text-gray-500 text-sm">chapters</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="text-gray-500">💖</span>
+                        <span className="text-xl">💖</span>
                         <span className="font-bold text-gray-900">{story.like_count}</span>
-                        <span className="text-gray-500 text-sm">いいね</span>
+                        <span className="text-gray-500 text-sm">likes</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xl">📅</span>
+                        <span className="text-gray-500 text-sm">{formatDate(story.updated_at)}</span>
                       </div>
                     </div>
 
-                    {/* アクション */}
-                    <div className="flex gap-2">
+                    {/* ボタン */}
+                    <div className="flex gap-2 mt-auto">
                       <Link
                         href={`/write?id=${story.id}`}
-                        className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition font-medium"
+                        className="px-6 py-2.5 text-white rounded-xl hover:shadow-lg transition-all font-semibold"
+                        style={{
+                          background: 'linear-gradient(135deg, #A0C878 0%, #7B9E5F 100%)',
+                        }}
                       >
-                        ✏️ 編集
+                        ✏️ Edit
                       </Link>
                       <Link
                         href={`/story/${story.id}`}
-                        className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition font-medium"
+                        className="px-6 py-2.5 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-all font-semibold"
                       >
-                        👁️ プレビュー
+                        👁️ View
                       </Link>
                       <button
                         onClick={() => togglePublish(story.id, story.status)}
-                        className={`px-4 py-2 rounded-lg transition font-medium ${
+                        className={`px-6 py-2.5 rounded-xl transition-all font-semibold ${
                           story.status === 'published'
                             ? 'bg-orange-100 text-orange-700 hover:bg-orange-200'
-                            : 'bg-green-500 text-white hover:bg-green-600'
+                            : 'bg-green-100 text-green-700 hover:bg-green-200'
                         }`}
                       >
-                        {story.status === 'published' ? '📝 下書きに戻す' : '✅ 公開する'}
+                        {story.status === 'published' ? '📝 To Draft' : '✅ Publish'}
                       </button>
                       <button
                         onClick={() => deleteStory(story.id)}
-                        className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition font-medium ml-auto"
+                        className="px-6 py-2.5 bg-red-100 text-red-700 rounded-xl hover:bg-red-200 transition-all font-semibold"
                       >
-                        🗑️ 削除
+                        🗑️ Delete
                       </button>
                     </div>
                   </div>
                 </div>
-              </div>
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
         )}
       </div>
     </div>
