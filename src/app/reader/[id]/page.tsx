@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/app/contexts/AuthContext';
 import dynamic from 'next/dynamic';
+import toast from 'react-hot-toast';
 
 // Leaflet を動的インポート（SSR対策）
 const MapContainer = dynamic(
@@ -79,7 +80,7 @@ export default function ImprovedReaderPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-  const [tempLocation, setTempLocation] = useState<any>(null); // 一時表示用
+  const [tempLocation, setTempLocation] = useState<any>(null);
 
   useEffect(() => {
     if (id) {
@@ -88,9 +89,12 @@ export default function ImprovedReaderPage() {
     }
   }, [id]);
 
-  // Nominatim APIで場所を検索（一時表示のみ）
+  // Nominatim APIで場所を検索
   const searchPlace = async () => {
-    if (!searchQuery.trim()) return;
+    if (!searchQuery.trim()) {
+      toast.error('場所を入力してください');
+      return;
+    }
     
     setIsSearching(true);
     
@@ -106,22 +110,18 @@ export default function ImprovedReaderPage() {
       if (data.length > 0) {
         const location = data[0];
         
-        // 写真を取得（非同期）
         setTempLocation({ ...location, photoUrl: undefined });
         
-        // Wikipedia写真を取得
         const photoUrl = await fetchWikipediaPhoto(location.display_name);
-        
-        // 写真URLを更新
         setTempLocation({ ...location, photoUrl });
         
         setSearchResults([]);
       } else {
-        alert('場所が見つかりませんでした');
+        toast.error('場所が見つかりませんでした');
       }
     } catch (error) {
-      console.error('場所検索エラー:', error);
-      alert('場所の検索に失敗しました');
+      console.error('Place search error:', error);
+      toast.error('場所の検索に失敗しました');
     } finally {
       setIsSearching(false);
     }
@@ -130,10 +130,8 @@ export default function ImprovedReaderPage() {
   // Wikipedia APIで写真を取得
   const fetchWikipediaPhoto = async (locationName: string): Promise<string | null> => {
     try {
-      // 場所名をクリーンアップ（「金龍山 浅草寺」→「浅草寺」）
       const cleanName = locationName.split(/[,、]/)[0].trim();
       
-      // Wikipedia検索
       const searchResponse = await fetch(
         `https://ja.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(cleanName)}&format=json&origin=*`
       );
@@ -148,7 +146,6 @@ export default function ImprovedReaderPage() {
       
       const pageTitle = searchData.query.search[0].title;
       
-      // ページ情報と画像を取得
       const pageResponse = await fetch(
         `https://ja.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(pageTitle)}&prop=pageimages&format=json&pithumbsize=800&origin=*`
       );
@@ -164,44 +161,65 @@ export default function ImprovedReaderPage() {
       
       return page.thumbnail?.source || null;
     } catch (error) {
-      console.error('Wikipedia API エラー:', error);
+      console.error('Wikipedia API error:', error);
       return null;
     }
   };
 
   // 場所をデータベースに保存
   const saveLocation = async () => {
-    if (!tempLocation) return;
+    if (!tempLocation) {
+      toast.error('保存する場所が選択されていません');
+      return;
+    }
+
+    if (!user) {
+      toast.error('ログインが必要です');
+      return;
+    }
 
     try {
-      // tempLocationに既に写真URLがある場合はそれを使用
-      const photoUrl = tempLocation.photoUrl || null;
+      console.log('Save data:', {
+        book_id: id,
+        user_id: user.id,
+        location_name: tempLocation.display_name.split(',')[0],
+        latitude: parseFloat(tempLocation.lat),
+        longitude: parseFloat(tempLocation.lon),
+        description: tempLocation.display_name,
+        photo_url: tempLocation.photoUrl || null
+      });
 
       const { data, error } = await supabase
         .from('book_locations')
         .insert([
           {
             book_id: id,
-            location_name: tempLocation.display_name.split(',')[0], // 最初の部分だけ
+            user_id: user.id,
+            location_name: tempLocation.display_name.split(',')[0],
             latitude: parseFloat(tempLocation.lat),
             longitude: parseFloat(tempLocation.lon),
             description: tempLocation.display_name,
             character_name: '',
-            photo_url: photoUrl,
+            photo_url: tempLocation.photoUrl || null,
             place_id: tempLocation.place_id,
             order_index: locations.length
           }
-        ]);
+        ])
+        .select();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Save error:', error);
+        throw error;
+      }
 
-      alert('場所を保存しました！');
+      console.log('Save success:', data);
+      toast.success('場所を保存しました!');
       setTempLocation(null);
       setSearchQuery('');
       await loadLocations();
-    } catch (error) {
-      console.error('場所保存エラー:', error);
-      alert('場所の保存に失敗しました');
+    } catch (error: any) {
+      console.error('Location save error:', error);
+      toast.error(`保存に失敗しました: ${error.message}`);
     }
   };
 
@@ -210,26 +228,31 @@ export default function ImprovedReaderPage() {
     if (!confirm('この場所を削除しますか？')) return;
 
     try {
+      console.log('Delete ID:', locationId);
+
       const { error } = await supabase
         .from('book_locations')
         .delete()
         .eq('id', locationId);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Delete error:', error);
+        throw error;
+      }
 
-      alert('場所を削除しました！');
+      console.log('Delete success');
+      toast.success('場所を削除しました!');
       await loadLocations();
-    } catch (error) {
-      console.error('場所削除エラー:', error);
-      alert('場所の削除に失敗しました');
+    } catch (error: any) {
+      console.error('Location delete error:', error);
+      toast.error(`削除に失敗しました: ${error.message}`);
     }
   };
 
-  // 場所をデータベースに追加（旧関数 - 削除）
   const calculateDistance = () => {
     if (locations.length < 2) return;
 
-    const R = 6371; // 地球の半径（km）
+    const R = 6371;
     let totalDistance = 0;
 
     for (let i = 0; i < locations.length - 1; i++) {
@@ -267,7 +290,7 @@ export default function ImprovedReaderPage() {
       if (error) throw error;
       setBook(data);
     } catch (error) {
-      console.error('本の読み込みエラー:', error);
+      console.error('Book load error:', error);
       notFound();
     } finally {
       setLoading(false);
@@ -275,22 +298,33 @@ export default function ImprovedReaderPage() {
   };
 
   const loadLocations = async () => {
+    if (!user) {
+      console.log('Not logged in, skipping location load');
+      return;
+    }
+
     try {
+      console.log('Loading locations...');
       const { data, error } = await supabase
         .from('book_locations')
         .select('*')
         .eq('book_id', id)
+        .eq('user_id', user.id)
         .order('order_index');
 
-      if (error) throw error;
+      if (error) {
+        console.error('Load locations error:', error);
+        throw error;
+      }
+      
+      console.log('Loaded locations:', data);
       setLocations(data || []);
     } catch (error) {
-      console.error('場所の読み込みエラー:', error);
+      console.error('Location load error:', error);
+      toast.error('場所の読み込みに失敗しました');
     }
   };
 
-  // 言葉を選択したときの処理
-  // 単語検索履歴を記録
   const recordWordLookup = async (word: string) => {
     if (!user) return;
 
@@ -306,8 +340,7 @@ export default function ImprovedReaderPage() {
           }
         ]);
     } catch (error) {
-      console.error('履歴記録エラー:', error);
-      // エラーがあっても無視（ユーザー体験に影響しない）
+      console.error('Word lookup history error:', error);
     }
   };
 
@@ -316,12 +349,10 @@ export default function ImprovedReaderPage() {
     const selectedText = selection?.toString().trim();
 
     if (selectedText && selectedText.length > 0 && selectedText.length < 20) {
-      console.log('選択された言葉:', selectedText);
+      console.log('Selected word:', selectedText);
       
-      // 履歴を記録
       await recordWordLookup(selectedText);
       
-      // データベースから辞書を検索
       const { data, error } = await supabase
         .from('word_dictionary')
         .select('*')
@@ -329,12 +360,12 @@ export default function ImprovedReaderPage() {
         .single();
 
       if (data) {
-        console.log('辞書で見つかりました:', data);
+        console.log('Found in dictionary:', data);
         setSelectedWord(data);
         setShowTranslationDialog(true);
         setShowMapDialog(false);
       } else {
-        console.log('辞書に見つかりませんでした');
+        console.log('Not found in dictionary');
         setSelectedWord({
           word: selectedText,
           reading: '',
@@ -355,10 +386,9 @@ export default function ImprovedReaderPage() {
     window.getSelection()?.removeAllRanges();
   };
 
-  // 単語を単語帳に保存
   const saveWordToVocabulary = async () => {
     if (!selectedWord || !user) {
-      alert('ログインが必要です');
+      toast.error('ログインが必要です');
       return;
     }
 
@@ -381,16 +411,15 @@ export default function ImprovedReaderPage() {
 
       if (error) throw error;
 
-      alert('💾 単語を保存しました！');
+      toast.success('💾 単語を保存しました!');
       closeTranslationDialog();
     } catch (error: any) {
-      console.error('単語保存エラー:', error);
+      console.error('Word save error:', error);
       
-      // 重複エラーの場合
       if (error.code === '23505') {
-        alert('この単語は既に保存されています');
+        toast.error('この単語は既に保存されています');
       } else {
-        alert('単語の保存に失敗しました');
+        toast.error('単語の保存に失敗しました');
       }
     }
   };
@@ -435,7 +464,6 @@ export default function ImprovedReaderPage() {
         </div>
         
         <div className="flex items-center gap-4">
-          {/* 場所表示ボタン */}
           <button
             onClick={openMapDialog}
             className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition font-medium flex items-center gap-2"
@@ -443,7 +471,6 @@ export default function ImprovedReaderPage() {
             🗺️ 物語の舞台
           </button>
           
-          {/* 文字サイズ */}
           <div className="flex items-center gap-2">
             <button onClick={decreaseFontSize} className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 font-bold">
               A-
@@ -456,14 +483,12 @@ export default function ImprovedReaderPage() {
         </div>
       </header>
 
-      {/* メインコンテンツ */}
+      {/* メインコンテンツ - 固定幅（動かない） */}
       <div className="flex-1 overflow-y-auto p-8 bg-white relative">
         
-        {/* 本文エリア - ダイアログがある時は右に余白 */}
+        {/* 本文エリア - 幅は常に固定 */}
         <div 
-          className={`leading-relaxed mx-auto transition-all duration-300 ${
-            showDialog ? 'max-w-3xl mr-[540px]' : 'max-w-4xl'
-          }`}
+          className="leading-relaxed mx-auto max-w-4xl"
           style={{ fontSize: `${fontSize}px` }}
           onMouseUp={handleTextSelection}
         >
@@ -476,7 +501,7 @@ export default function ImprovedReaderPage() {
           ))}
         </div>
 
-        {/* 翻訳ダイアログ */}
+        {/* 翻訳ダイアログ - 完全にオーバーレイ */}
         {showTranslationDialog && selectedWord && (
           <div className="fixed top-24 right-8 w-[500px] max-h-[calc(100vh-10rem)] bg-white rounded-3xl shadow-2xl z-50 animate-slideInRight flex flex-col">
             <div className="flex-1 overflow-y-auto p-8">
@@ -527,7 +552,6 @@ export default function ImprovedReaderPage() {
                 </div>
               )}
 
-              {/* 保存ボタン */}
               <button
                 onClick={saveWordToVocabulary}
                 className="w-full px-6 py-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-2xl hover:from-blue-600 hover:to-blue-700 transition font-bold text-lg shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
@@ -538,7 +562,7 @@ export default function ImprovedReaderPage() {
           </div>
         )}
 
-        {/* マップダイアログ */}
+        {/* マップダイアログ - 完全にオーバーレイ */}
         {showMapDialog && (
           <div className="fixed top-24 right-8 w-[500px] max-h-[calc(100vh-10rem)] bg-white rounded-3xl shadow-2xl z-50 animate-slideInRight flex flex-col">
             <div className="flex-1 overflow-y-auto p-8">
@@ -568,14 +592,13 @@ export default function ImprovedReaderPage() {
                     disabled={isSearching}
                     className="px-6 py-3 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition font-medium disabled:bg-gray-300"
                   >
-                    {isSearching ? '検索中...' : '🔍 検索'}
+                    {isSearching ? '検索中...' : '🔍'}
                   </button>
                 </div>
 
-                {/* 検索結果（写真付き、シンプル） */}
+                {/* 検索結果 */}
                 {tempLocation && (
                   <div className="mt-4 bg-white rounded-2xl border border-gray-300 shadow-lg overflow-hidden">
-                    {/* Wikipedia写真（読み込み中） */}
                     {tempLocation.photoUrl === undefined ? (
                       <div className="w-full h-48 bg-gray-200 animate-pulse flex items-center justify-center">
                         <span className="text-gray-400">📸 写真を読み込み中...</span>
@@ -611,7 +634,7 @@ export default function ImprovedReaderPage() {
                           onClick={() => setTempLocation(null)}
                           className="px-4 py-3 bg-gray-200 text-gray-700 rounded-xl hover:bg-gray-300 transition font-medium"
                         >
-                          ✕ 閉じる
+                          ✕
                         </button>
                       </div>
                     </div>
@@ -621,7 +644,6 @@ export default function ImprovedReaderPage() {
 
               {locations.length > 0 || tempLocation ? (
                 <>
-                  {/* OpenStreetMap */}
                   {typeof window !== 'undefined' && (locations.length > 0 || tempLocation) && (
                     <div className="mb-6 rounded-2xl overflow-hidden shadow-xl h-64">
                       <MapContainer
@@ -639,7 +661,6 @@ export default function ImprovedReaderPage() {
                           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
                         />
                         
-                        {/* 保存済みマーカーのみ表示 */}
                         {locations.map((location, index) => (
                           <Marker
                             key={location.id}
@@ -657,7 +678,6 @@ export default function ImprovedReaderPage() {
                           </Marker>
                         ))}
                         
-                        {/* 線で繋ぐ */}
                         {locations.length > 1 && (
                           <Polyline
                             positions={locations.map(loc => [loc.latitude, loc.longitude])}
@@ -670,7 +690,6 @@ export default function ImprovedReaderPage() {
                     </div>
                   )}
 
-                  {/* 距離表示 */}
                   {distance && locations.length > 1 && (
                     <div className="mb-6 p-6 bg-gradient-to-r from-blue-50 to-blue-100 rounded-2xl border-l-4 border-blue-500">
                       <h4 className="font-bold text-blue-700 mb-2 flex items-center gap-2 text-lg">
@@ -683,7 +702,6 @@ export default function ImprovedReaderPage() {
                     </div>
                   )}
 
-                  {/* 場所リスト */}
                   <div className="space-y-4">
                     <h4 className="font-bold text-gray-900 text-xl mb-4">保存された場所：</h4>
                     {locations.map((location, index) => (
@@ -691,7 +709,6 @@ export default function ImprovedReaderPage() {
                         key={location.id} 
                         className="p-5 bg-gradient-to-r from-gray-50 to-gray-100 rounded-2xl hover:shadow-md transition border border-gray-200"
                       >
-                        {/* 写真表示 */}
                         {location.photo_url && (
                           <div className="mb-4 rounded-xl overflow-hidden">
                             <img 
@@ -739,7 +756,6 @@ export default function ImprovedReaderPage() {
         )}
       </div>
 
-      {/* Leaflet CSS */}
       <link
         rel="stylesheet"
         href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -747,7 +763,6 @@ export default function ImprovedReaderPage() {
         crossOrigin=""
       />
 
-      {/* アニメーション用CSS */}
       <style jsx>{`
         @keyframes slideInRight {
           from {

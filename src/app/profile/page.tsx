@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
+import ImageCropModal from '@/app/components/ImageCropModal';
 
 interface Profile {
   username: string;
@@ -29,6 +30,10 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [booksRead, setBooksRead] = useState(0);
   const [booksReading, setBooksReading] = useState(0);
+  const [userId, setUserId] = useState<string>('');
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState<string>('');
+  const [isHovering, setIsHovering] = useState(false);
 
   useEffect(() => {
     loadProfile();
@@ -43,6 +48,8 @@ export default function ProfilePage() {
         return;
       }
 
+      setUserId(user.id);
+
       const { data: profileData, error } = await supabase
         .from('profiles')
         .select('*')
@@ -52,6 +59,9 @@ export default function ProfilePage() {
       if (error) throw error;
 
       setProfile(profileData);
+      
+      const url = profileData.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(profileData.username)}&background=A0C878&color=fff&size=200`;
+      setAvatarUrl(url);
 
       const { count: readCount } = await supabase
         .from('bookshelves')
@@ -76,29 +86,34 @@ export default function ProfilePage() {
     }
   };
 
-  // ジャンル別の色を返す関数
+  const handleImageUploaded = (url: string) => {
+    setAvatarUrl(url);
+    if (profile) {
+      setProfile({ ...profile, avatar_url: url });
+    }
+  };
+
   const getGenreColor = (genreName: string) => {
     const lower = genreName.toLowerCase();
     if (lower.includes('恋愛') || lower.includes('ロマンス') || lower.includes('romance')) 
-      return 'linear-gradient(135deg, #ec4899 0%, #db2777 100%)'; // ピンク
+      return 'linear-gradient(135deg, #ec4899 0%, #db2777 100%)';
     if (lower.includes('ミステリー') || lower.includes('推理') || lower.includes('mystery')) 
-      return 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)'; // 紫
+      return 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)';
     if (lower.includes('sf') || lower.includes('サイエンス') || lower.includes('science')) 
-      return 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)'; // 青
+      return 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)';
     if (lower.includes('ファンタジー') || lower.includes('冒険') || lower.includes('fantasy')) 
-      return 'linear-gradient(135deg, #10b981 0%, #059669 100%)'; // 緑
+      return 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
     if (lower.includes('歴史') || lower.includes('時代') || lower.includes('history')) 
-      return 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)'; // オレンジ
+      return 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)';
     if (lower.includes('ホラー') || lower.includes('怖い') || lower.includes('horror')) 
-      return 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)'; // 赤
+      return 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)';
     if (lower.includes('ビジネス') || lower.includes('自己啓発') || lower.includes('business')) 
-      return 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)'; // 黄色
+      return 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)';
     if (lower.includes('青春') || lower.includes('学園') || lower.includes('youth')) 
-      return 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)'; // 水色
+      return 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)';
     if (lower.includes('コメディ') || lower.includes('comedy')) 
-      return 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)'; // オレンジ赤
-    // デフォルト（小説、その他など）
-    return 'linear-gradient(135deg, #A0C878 0%, #7B9E5F 100%)'; // グリーン
+      return 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)';
+    return 'linear-gradient(135deg, #A0C878 0%, #7B9E5F 100%)';
   };
 
   if (loading) {
@@ -120,8 +135,6 @@ export default function ProfilePage() {
     );
   }
 
-  const avatarUrl = profile.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(profile.username)}&background=A0C878&color=fff&size=200`;
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50">
       <div className="container mx-auto px-6 py-8 max-w-6xl">
@@ -135,12 +148,32 @@ export default function ProfilePage() {
           <div className="flex flex-col md:flex-row gap-8">
             {/* プロフィール画像 */}
             <div className="flex-shrink-0">
-              <div className="w-40 h-40 rounded-full overflow-hidden shadow-2xl">
+              <div 
+                className="relative w-40 h-40 rounded-full overflow-hidden shadow-2xl cursor-pointer group"
+                onMouseEnter={() => setIsHovering(true)}
+                onMouseLeave={() => setIsHovering(false)}
+                onClick={() => setIsModalOpen(true)}
+              >
                 <img 
                   src={avatarUrl}
                   alt={profile.username}
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-cover transition-transform group-hover:scale-110"
                 />
+                
+                {/* ホバーオーバーレイ */}
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: isHovering ? 1 : 0 }}
+                  className="absolute inset-0 flex items-center justify-center"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(160, 200, 120, 0.9) 0%, rgba(123, 158, 95, 0.9) 100%)',
+                  }}
+                >
+                  <div className="text-center text-white">
+                    <div className="text-4xl mb-1">📷</div>
+                    <div className="text-sm font-bold">変更</div>
+                  </div>
+                </motion.div>
               </div>
             </div>
 
@@ -278,7 +311,7 @@ export default function ProfilePage() {
           {/* 右カラム */}
           <div className="md:col-span-2 space-y-6">
                     
-            {/* 好きなジャンル - 色分け対応 */}
+            {/* 好きなジャンル */}
             {profile.favorite_genres && profile.favorite_genres.length > 0 && (
               <motion.div
                 initial={{ opacity: 0, x: 20 }}
@@ -367,7 +400,7 @@ export default function ProfilePage() {
               </motion.div>
             )}
 
-            {/* 読書統計 - 色分け対応 */}
+            {/* 読書統計 */}
             <motion.div
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
@@ -415,6 +448,14 @@ export default function ProfilePage() {
         </div>
 
       </div>
+
+      {/* 画像アップロードモーダル */}
+      <ImageCropModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onImageUploaded={handleImageUploaded}
+        userId={userId}
+      />
     </div>
   );
 }
