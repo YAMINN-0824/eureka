@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@react-google-maps/api": "^2.20.7",
     "@supabase/supabase-js": "^2.75.0",
     "framer-motion": "^12.23.24",
     "leaflet": "^1.9.4",

@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/app/contexts/AuthContext';
 import dynamic from 'next/dynamic';
 import toast from 'react-hot-toast';
+import L from 'leaflet';
 
 // Leaflet を動的インポート（SSR対策）
 const MapContainer = dynamic(
@@ -58,6 +59,59 @@ interface Location {
   text_position?: number;
 }
 
+// カスタムマーカーアイコン（ピン型 + 絵文字）- 青色
+const createCustomIcon = (isSelected = false) => {
+  const size = isSelected ? 60 : 50;
+  const height = isSelected ? 70 : 60;
+  
+  const svg = `
+    <svg width="${size}" height="${height}" viewBox="0 0 50 60" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="grad${isSelected ? 'Selected' : ''}" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" style="stop-color:#4285F4;stop-opacity:1" />
+          <stop offset="100%" style="stop-color:#1a73e8;stop-opacity:1" />
+        </linearGradient>
+        <filter id="shadow">
+          <feDropShadow dx="0" dy="2" stdDeviation="4" flood-opacity="0.3"/>
+        </filter>
+      </defs>
+      
+      <path 
+        d="M25,5 C15,5 7,13 7,23 C7,35 25,55 25,55 C25,55 43,35 43,23 C43,13 35,5 25,5 Z" 
+        fill="url(#grad${isSelected ? 'Selected' : ''})" 
+        filter="url(#shadow)"
+        stroke="white"
+        stroke-width="${isSelected ? '3' : '2'}"
+      />
+      
+      <circle cx="25" cy="23" r="11" fill="white" opacity="0.95"/>
+      
+      <text 
+        x="25" 
+        y="30" 
+        font-size="16" 
+        text-anchor="middle" 
+        font-family="Arial, sans-serif"
+      >📍</text>
+      
+      ${isSelected ? `
+        <circle cx="25" cy="23" r="18" fill="none" stroke="#4285F4" stroke-width="2" opacity="0.6">
+          <animate attributeName="r" from="18" to="24" dur="1.5s" repeatCount="indefinite"/>
+          <animate attributeName="opacity" from="0.6" to="0" dur="1.5s" repeatCount="indefinite"/>
+        </circle>
+      ` : ''}
+    </svg>
+  `;
+
+  return L.divIcon({
+    html: svg,
+    className: 'custom-marker',
+    iconSize: [size, height],
+    iconAnchor: [size / 2, height - 5],
+    popupAnchor: [0, -(height - 10)]
+  });
+};
+
 export default function ImprovedReaderPage() {
   const params = useParams();
   const { id } = params;
@@ -70,15 +124,18 @@ export default function ImprovedReaderPage() {
   // ダイアログの状態
   const [showTranslationDialog, setShowTranslationDialog] = useState(false);
   const [showMapDialog, setShowMapDialog] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   
   // データ
   const [selectedWord, setSelectedWord] = useState<WordDefinition | null>(null);
   const [locations, setLocations] = useState<Location[]>([]);
+  const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
   const [distance, setDistance] = useState<string>('');
+  const [mapCenter, setMapCenter] = useState<[number, number]>([35.6762, 139.6503]); // 東京
+  const [mapZoom, setMapZoom] = useState(10);
   
   // 検索機能
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [tempLocation, setTempLocation] = useState<any>(null);
 
@@ -112,10 +169,13 @@ export default function ImprovedReaderPage() {
         
         setTempLocation({ ...location, photoUrl: undefined });
         
+        // 地図を移動
+        setMapCenter([parseFloat(location.lat), parseFloat(location.lon)]);
+        setMapZoom(15);
+        
+        // Wikipedia写真を取得
         const photoUrl = await fetchWikipediaPhoto(location.display_name);
         setTempLocation({ ...location, photoUrl });
-        
-        setSearchResults([]);
       } else {
         toast.error('場所が見つかりませんでした');
       }
@@ -179,16 +239,6 @@ export default function ImprovedReaderPage() {
     }
 
     try {
-      console.log('Save data:', {
-        book_id: id,
-        user_id: user.id,
-        location_name: tempLocation.display_name.split(',')[0],
-        latitude: parseFloat(tempLocation.lat),
-        longitude: parseFloat(tempLocation.lon),
-        description: tempLocation.display_name,
-        photo_url: tempLocation.photoUrl || null
-      });
-
       const { data, error } = await supabase
         .from('book_locations')
         .insert([
@@ -207,13 +257,9 @@ export default function ImprovedReaderPage() {
         ])
         .select();
 
-      if (error) {
-        console.error('Save error:', error);
-        throw error;
-      }
+      if (error) throw error;
 
-      console.log('Save success:', data);
-      toast.success('場所を保存しました!');
+      toast.success('📍 場所を保存しました!');
       setTempLocation(null);
       setSearchQuery('');
       await loadLocations();
@@ -228,20 +274,15 @@ export default function ImprovedReaderPage() {
     if (!confirm('この場所を削除しますか？')) return;
 
     try {
-      console.log('Delete ID:', locationId);
-
       const { error } = await supabase
         .from('book_locations')
         .delete()
         .eq('id', locationId);
 
-      if (error) {
-        console.error('Delete error:', error);
-        throw error;
-      }
+      if (error) throw error;
 
-      console.log('Delete success');
       toast.success('場所を削除しました!');
+      setSelectedLocation(null);
       await loadLocations();
     } catch (error: any) {
       console.error('Location delete error:', error);
@@ -276,6 +317,15 @@ export default function ImprovedReaderPage() {
   useEffect(() => {
     if (locations.length > 1) {
       calculateDistance();
+    } else {
+      setDistance('');
+    }
+  }, [locations]);
+
+  useEffect(() => {
+    if (locations.length > 0) {
+      setMapCenter([locations[0].latitude, locations[0].longitude]);
+      setMapZoom(12);
     }
   }, [locations]);
 
@@ -298,13 +348,9 @@ export default function ImprovedReaderPage() {
   };
 
   const loadLocations = async () => {
-    if (!user) {
-      console.log('Not logged in, skipping location load');
-      return;
-    }
+    if (!user) return;
 
     try {
-      console.log('Loading locations...');
       const { data, error } = await supabase
         .from('book_locations')
         .select('*')
@@ -312,12 +358,8 @@ export default function ImprovedReaderPage() {
         .eq('user_id', user.id)
         .order('order_index');
 
-      if (error) {
-        console.error('Load locations error:', error);
-        throw error;
-      }
+      if (error) throw error;
       
-      console.log('Loaded locations:', data);
       setLocations(data || []);
     } catch (error) {
       console.error('Location load error:', error);
@@ -349,8 +391,6 @@ export default function ImprovedReaderPage() {
     const selectedText = selection?.toString().trim();
 
     if (selectedText && selectedText.length > 0 && selectedText.length < 20) {
-      console.log('Selected word:', selectedText);
-      
       await recordWordLookup(selectedText);
       
       const { data, error } = await supabase
@@ -360,12 +400,10 @@ export default function ImprovedReaderPage() {
         .single();
 
       if (data) {
-        console.log('Found in dictionary:', data);
         setSelectedWord(data);
         setShowTranslationDialog(true);
         setShowMapDialog(false);
       } else {
-        console.log('Not found in dictionary');
         setSelectedWord({
           word: selectedText,
           reading: '',
@@ -414,8 +452,6 @@ export default function ImprovedReaderPage() {
       toast.success('💾 単語を保存しました!');
       closeTranslationDialog();
     } catch (error: any) {
-      console.error('Word save error:', error);
-      
       if (error.code === '23505') {
         toast.error('この単語は既に保存されています');
       } else {
@@ -427,10 +463,12 @@ export default function ImprovedReaderPage() {
   const openMapDialog = () => {
     setShowMapDialog(true);
     setShowTranslationDialog(false);
+    setSidebarCollapsed(false);
   };
 
   const closeMapDialog = () => {
     setShowMapDialog(false);
+    setSidebarCollapsed(true);
   };
 
   const increaseFontSize = () => setFontSize((size) => Math.min(size + 2, 32));
@@ -438,7 +476,7 @@ export default function ImprovedReaderPage() {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center min-h-screen">
+      <div className="flex justify-center items-center min-h-screen bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50">
         <div className="text-xl text-gray-600">読み込み中...</div>
       </div>
     );
@@ -448,16 +486,21 @@ export default function ImprovedReaderPage() {
     return <div>本が見つかりません。</div>;
   }
 
-  const showDialog = showTranslationDialog || showMapDialog;
-
   return (
-    <div className="h-screen flex flex-col bg-gray-50">
+    <div className="h-screen flex flex-col bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50">
       
       {/* ヘッダー */}
-      <header className="bg-white border-b px-6 py-4 flex justify-between items-center shadow-sm">
+      <header className="bg-white border-b px-6 py-4 flex justify-between items-center shadow-sm relative z-10">
         <div className="flex items-center gap-4">
-          <Link href="/my-bookshelf" className="text-blue-600 hover:underline font-medium">
-            ← 本棚に戻る
+          <Link 
+            href="/my-bookshelf" 
+            className="px-4 py-2 rounded-xl font-medium transition-all"
+            style={{
+              background: 'linear-gradient(135deg, #A0C878 0%, #7B9E5F 100%)',
+              color: 'white'
+            }}
+          >
+            ← 本棚
           </Link>
           <h1 className="text-xl font-bold text-gray-900">{book.title}</h1>
           <span className="text-gray-500">- {book.author}</span>
@@ -466,50 +509,65 @@ export default function ImprovedReaderPage() {
         <div className="flex items-center gap-4">
           <button
             onClick={openMapDialog}
-            className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition font-medium flex items-center gap-2"
+            className="px-6 py-2 rounded-xl text-white font-medium transition-all hover:shadow-lg"
+            style={{
+              background: 'linear-gradient(135deg, #A0C878 0%, #7B9E5F 100%)',
+            }}
           >
             🗺️ 物語の舞台
           </button>
           
-          <div className="flex items-center gap-2">
-            <button onClick={decreaseFontSize} className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 font-bold">
+          <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-3 py-1">
+            <button 
+              onClick={decreaseFontSize} 
+              className="px-3 py-1 hover:bg-gray-100 rounded-lg transition font-bold text-gray-700"
+            >
               A-
             </button>
-            <span className="text-sm w-12 text-center font-medium">{fontSize}px</span>
-            <button onClick={increaseFontSize} className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 font-bold">
+            <span className="text-sm w-12 text-center font-medium text-gray-600">{fontSize}px</span>
+            <button 
+              onClick={increaseFontSize} 
+              className="px-3 py-1 hover:bg-gray-100 rounded-lg transition font-bold text-gray-700"
+            >
               A+
             </button>
           </div>
         </div>
       </header>
 
-      {/* メインコンテンツ - 固定幅（動かない） */}
-      <div className="flex-1 overflow-y-auto p-8 bg-white relative">
+      {/* メインコンテンツ */}
+      <div className="flex-1 overflow-hidden flex relative">
         
-        {/* 本文エリア - 幅は常に固定 */}
-        <div 
-          className="leading-relaxed mx-auto max-w-4xl"
-          style={{ fontSize: `${fontSize}px` }}
-          onMouseUp={handleTextSelection}
-        >
-          {book.content.split('\n').map((paragraph, index) => (
-            paragraph.trim() && (
-              <p key={index} className="mb-6 text-gray-800">
-                {paragraph}
-              </p>
-            )
-          ))}
+        {/* 本文エリア */}
+        <div className="flex-1 overflow-y-auto p-8 bg-white">
+          <div 
+            className="leading-relaxed mx-auto max-w-4xl"
+            style={{ fontSize: `${fontSize}px` }}
+            onMouseUp={handleTextSelection}
+          >
+            {book.content.split('\n').map((paragraph, index) => (
+              paragraph.trim() && (
+                <p key={index} className="mb-6 text-gray-800">
+                  {paragraph}
+                </p>
+              )
+            ))}
+          </div>
         </div>
 
-        {/* 翻訳ダイアログ - 完全にオーバーレイ */}
+        {/* 翻訳ダイアログ */}
         {showTranslationDialog && selectedWord && (
-          <div className="fixed top-24 right-8 w-[500px] max-h-[calc(100vh-10rem)] bg-white rounded-3xl shadow-2xl z-50 animate-slideInRight flex flex-col">
+          <div className="fixed top-24 right-8 w-[450px] max-h-[calc(100vh-10rem)] bg-white rounded-3xl shadow-2xl z-50 animate-slideInRight flex flex-col border-4"
+            style={{ borderColor: '#A0C878' }}
+          >
             <div className="flex-1 overflow-y-auto p-8">
               <div className="flex justify-between items-start mb-6">
-                <h2 className="text-3xl font-bold text-gray-900">📚 {selectedWord.word}</h2>
+                <h2 className="text-3xl font-bold" style={{ color: '#7B9E5F' }}>
+                  📚 {selectedWord.word}
+                </h2>
                 <button
                   onClick={closeTranslationDialog}
-                  className="text-gray-400 hover:text-gray-600 text-3xl font-bold w-10 h-10 flex items-center justify-center rounded-full hover:bg-gray-100 transition flex-shrink-0 ml-4"
+                  className="text-gray-400 hover:text-gray-600 text-3xl font-bold w-10 h-10 flex items-center justify-center rounded-full hover:bg-gray-100 transition"
                 >
                   ×
                 </button>
@@ -520,8 +578,15 @@ export default function ImprovedReaderPage() {
               )}
               
               {selectedWord.old_meaning && (
-                <div className="mb-6 p-6 bg-gradient-to-r from-blue-50 to-blue-100 rounded-2xl border-l-4 border-blue-500">
-                  <h4 className="font-bold text-blue-700 mb-3 text-lg flex items-center gap-2">
+                <div className="mb-6 p-6 rounded-2xl border-l-4"
+                  style={{
+                    background: 'linear-gradient(to right, #f0fdf4, #dcfce7)',
+                    borderColor: '#A0C878'
+                  }}
+                >
+                  <h4 className="font-bold mb-3 text-lg flex items-center gap-2"
+                    style={{ color: '#7B9E5F' }}
+                  >
                     📚 明治時代の意味
                   </h4>
                   <p className="text-gray-800 text-lg leading-relaxed">{selectedWord.old_meaning}</p>
@@ -529,8 +594,15 @@ export default function ImprovedReaderPage() {
               )}
               
               {selectedWord.modern_meaning && (
-                <div className="mb-6 p-6 bg-gradient-to-r from-green-50 to-green-100 rounded-2xl border-l-4 border-green-500">
-                  <h4 className="font-bold text-green-700 mb-3 text-lg flex items-center gap-2">
+                <div className="mb-6 p-6 rounded-2xl border-l-4"
+                  style={{
+                    background: 'linear-gradient(to right, #ecfdf5, #d1fae5)',
+                    borderColor: '#A0C878'
+                  }}
+                >
+                  <h4 className="font-bold mb-3 text-lg flex items-center gap-2"
+                    style={{ color: '#7B9E5F' }}
+                  >
                     📖 現代の意味
                   </h4>
                   <p className="text-gray-800 text-lg leading-relaxed">{selectedWord.modern_meaning}</p>
@@ -538,8 +610,8 @@ export default function ImprovedReaderPage() {
               )}
               
               {selectedWord.example && (
-                <div className="mb-6 p-6 bg-gradient-to-r from-purple-50 to-purple-100 rounded-2xl border-l-4 border-purple-500">
-                  <h4 className="font-bold text-purple-700 mb-3 text-lg flex items-center gap-2">
+                <div className="mb-6 p-6 bg-gray-50 rounded-2xl border border-gray-200">
+                  <h4 className="font-bold text-gray-700 mb-3 text-lg flex items-center gap-2">
                     💡 例文
                   </h4>
                   <p className="text-gray-800 text-lg italic leading-relaxed">「{selectedWord.example}」</p>
@@ -554,7 +626,10 @@ export default function ImprovedReaderPage() {
 
               <button
                 onClick={saveWordToVocabulary}
-                className="w-full px-6 py-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-2xl hover:from-blue-600 hover:to-blue-700 transition font-bold text-lg shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
+                className="w-full px-6 py-4 text-white rounded-2xl transition font-bold text-lg shadow-lg hover:shadow-xl"
+                style={{
+                  background: 'linear-gradient(135deg, #A0C878 0%, #7B9E5F 100%)',
+                }}
               >
                 💾 この単語を保存
               </button>
@@ -562,194 +637,278 @@ export default function ImprovedReaderPage() {
           </div>
         )}
 
-        {/* マップダイアログ - 完全にオーバーレイ */}
+         {/* マップダイアログ（折りたたみサイドバー） */}
         {showMapDialog && (
-          <div className="fixed top-24 right-8 w-[500px] max-h-[calc(100vh-10rem)] bg-white rounded-3xl shadow-2xl z-50 animate-slideInRight flex flex-col">
-            <div className="flex-1 overflow-y-auto p-8">
-              <div className="flex justify-between items-start mb-6">
-                <h2 className="text-3xl font-bold text-gray-900">🗺️ 物語の舞台</h2>
-                <button
-                  onClick={closeMapDialog}
-                  className="text-gray-400 hover:text-gray-600 text-3xl font-bold w-10 h-10 flex items-center justify-center rounded-full hover:bg-gray-100 transition flex-shrink-0 ml-4"
-                >
-                  ×
-                </button>
-              </div>
-              
-              {/* 場所検索 */}
-              <div className="mb-6">
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && searchPlace()}
-                    placeholder="場所を検索... (例: 浅草寺)"
-                    className="flex-1 px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:border-blue-500 text-lg"
-                  />
-                  <button
-                    onClick={searchPlace}
-                    disabled={isSearching}
-                    className="px-6 py-3 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition font-medium disabled:bg-gray-300"
-                  >
-                    {isSearching ? '検索中...' : '🔍'}
-                  </button>
-                </div>
-
-                {/* 検索結果 */}
-                {tempLocation && (
-                  <div className="mt-4 bg-white rounded-2xl border border-gray-300 shadow-lg overflow-hidden">
-                    {tempLocation.photoUrl === undefined ? (
-                      <div className="w-full h-48 bg-gray-200 animate-pulse flex items-center justify-center">
-                        <span className="text-gray-400">📸 写真を読み込み中...</span>
-                      </div>
-                    ) : tempLocation.photoUrl ? (
-                      <img 
-                        src={tempLocation.photoUrl} 
-                        alt={tempLocation.display_name}
-                        className="w-full h-48 object-cover"
+          <div className="fixed inset-0 z-40 flex">
+            
+            {/* サイドバー */}
+            <div 
+              className="bg-white shadow-2xl overflow-y-auto transition-all duration-300"
+              style={{
+                width: sidebarCollapsed ? '0px' : '400px',
+                borderRight: sidebarCollapsed ? 'none' : '2px solid #A0C878'
+              }}
+            >
+              {!sidebarCollapsed && (
+                <div className="p-6">
+                  <div className="flex justify-between items-start mb-6">
+                    <h2 className="text-2xl font-bold" style={{ color: '#7B9E5F' }}>
+                      🗺️ 物語の舞台
+                    </h2>
+                    <button
+                      onClick={closeMapDialog}
+                      className="text-gray-400 hover:text-gray-600 text-2xl font-bold w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition"
+                    >
+                      ×
+                    </button>
+                  </div>
+                  
+                  {/* 場所検索 */}
+                  <div className="mb-6">
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        onKeyPress={(e) => e.key === 'Enter' && searchPlace()}
+                        placeholder="場所を検索..."
+                        className="flex-1 px-4 py-3 border-2 rounded-xl focus:outline-none focus:border-[#7B9E5F] text-base"
+                        style={{
+                          borderColor: '#A0C878'
+                        }}
                       />
-                    ) : (
-                      <div className="w-full h-48 bg-gradient-to-r from-blue-100 to-blue-200 flex items-center justify-center">
-                        <span className="text-4xl">📍</span>
+                      <button
+                        onClick={searchPlace}
+                        disabled={isSearching}
+                        className="px-6 py-3 text-white rounded-xl transition font-medium disabled:opacity-50"
+                        style={{
+                          background: 'linear-gradient(135deg, #A0C878 0%, #7B9E5F 100%)',
+                        }}
+                      >
+                        {isSearching ? '...' : '🔍'}
+                      </button>
+                    </div>
+
+                  {/* 検索結果 */}
+                    {tempLocation && (
+                      <div className="mt-4 bg-white rounded-2xl border-2 shadow-lg overflow-hidden"
+                        style={{ borderColor: '#A0C878' }}
+                      >
+                        {tempLocation.photoUrl === undefined ? (
+                          <div className="w-full h-40 bg-gray-200 animate-pulse flex items-center justify-center">
+                            <span className="text-gray-400">📸 写真を読み込み中...</span>
+                          </div>
+                        ) : tempLocation.photoUrl ? (
+                          <img 
+                            src={tempLocation.photoUrl} 
+                            alt={tempLocation.display_name}
+                            className="w-full h-40 object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-40 flex items-center justify-center"
+                            style={{
+                              background: 'linear-gradient(135deg, #A0C878 0%, #7B9E5F 100%)',
+                            }}
+                          >
+                            <span className="text-5xl">📍</span>
+                          </div>
+                        )}
+                        
+                        <div className="p-4">
+                          <h5 className="font-bold text-gray-900 text-lg mb-2">
+                            {tempLocation.display_name.split(',')[0]}
+                          </h5>
+                          <p className="text-sm text-gray-600 mb-4">
+                            {tempLocation.display_name}
+                          </p>
+                          
+                          <div className="flex gap-2">
+                            <button
+                              onClick={saveLocation}
+                              className="flex-1 px-4 py-2 text-white rounded-xl transition font-medium"
+                              style={{
+                                background: 'linear-gradient(135deg, #A0C878 0%, #7B9E5F 100%)',
+                              }}
+                            >
+                              💾 保存
+                            </button>
+                            <button
+                              onClick={() => setTempLocation(null)}
+                              className="px-4 py-2 bg-gray-200 text-gray-700 rounded-xl hover:bg-gray-300 transition font-medium"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        </div>
                       </div>
                     )}
-                    
-                    <div className="p-5">
-                      <h5 className="font-bold text-gray-900 text-xl mb-2">
-                        {tempLocation.display_name.split(',')[0]}
-                      </h5>
-                      <p className="text-sm text-gray-600 mb-4">
-                        {tempLocation.display_name}
-                      </p>
-                      
-                      <div className="flex gap-2">
-                        <button
-                          onClick={saveLocation}
-                          className="flex-1 px-4 py-3 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition font-medium"
-                        >
-                          💾 保存
-                        </button>
-                        <button
-                          onClick={() => setTempLocation(null)}
-                          className="px-4 py-3 bg-gray-200 text-gray-700 rounded-xl hover:bg-gray-300 transition font-medium"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    </div>
                   </div>
-                )}
-              </div>
 
-              {locations.length > 0 || tempLocation ? (
-                <>
-                  {typeof window !== 'undefined' && (locations.length > 0 || tempLocation) && (
-                    <div className="mb-6 rounded-2xl overflow-hidden shadow-xl h-64">
-                      <MapContainer
-                        key={tempLocation ? `temp-${tempLocation.place_id}` : 'saved'}
-                        center={
-                          tempLocation 
-                            ? [parseFloat(tempLocation.lat), parseFloat(tempLocation.lon)]
-                            : [locations[0].latitude, locations[0].longitude]
-                        }
-                        zoom={tempLocation ? 15 : 10}
-                        style={{ height: '100%', width: '100%' }}
-                      >
-                        <TileLayer
-                          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                        />
-                        
-                        {locations.map((location, index) => (
-                          <Marker
-                            key={location.id}
-                            position={[location.latitude, location.longitude]}
-                          >
-                            <Popup>
-                              <div className="p-2">
-                                <h3 className="font-bold">📍 {location.location_name}</h3>
-                                {location.character_name && (
-                                  <p className="text-sm text-blue-600">👤 {location.character_name}</p>
-                                )}
-                                <p className="text-sm text-gray-600">{location.description}</p>
-                              </div>
-                            </Popup>
-                          </Marker>
-                        ))}
-                        
-                        {locations.length > 1 && (
-                          <Polyline
-                            positions={locations.map(loc => [loc.latitude, loc.longitude])}
-                            color="#4285F4"
-                            weight={4}
-                            opacity={0.8}
-                          />
-                        )}
-                      </MapContainer>
-                    </div>
-                  )}
-
-                  {distance && locations.length > 1 && (
-                    <div className="mb-6 p-6 bg-gradient-to-r from-blue-50 to-blue-100 rounded-2xl border-l-4 border-blue-500">
-                      <h4 className="font-bold text-blue-700 mb-2 flex items-center gap-2 text-lg">
-                        📏 総距離
+                  {/* 保存された場所リスト */}
+                  {locations.length > 0 && (
+                    <div className="space-y-3">
+                      <h4 className="font-bold text-gray-900 text-lg mb-4">
+                        保存された場所：
                       </h4>
-                      <p className="text-3xl font-bold text-blue-900">{distance}</p>
-                      <p className="text-gray-600 mt-2">
-                        {locations[0].location_name} → {locations[locations.length - 1].location_name}
-                      </p>
+                      {locations.map((location, index) => (
+                        <div 
+                          key={location.id}
+                          onClick={() => {
+                            setSelectedLocation(location);
+                            setMapCenter([location.latitude, location.longitude]);
+                            setMapZoom(15);
+                          }}
+                          className="p-4 rounded-2xl border-2 cursor-pointer transition hover:shadow-md"
+                          style={{
+                            borderColor: selectedLocation?.id === location.id ? '#7B9E5F' : '#e5e7eb',
+                            background: selectedLocation?.id === location.id ? '#f0fdf4' : 'white'
+                          }}
+                        >
+                          <div className="flex items-start justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xl">📍</span>
+                              <h3 className="font-bold text-gray-900">
+                                {index + 1}. {location.location_name}
+                              </h3>
+                            </div>
+                          </div>
+                          <p className="text-sm text-gray-600 ml-7">{location.description}</p>
+                        </div>
+                      ))}
+
+                      {distance && locations.length > 1 && (
+                        <div className="p-4 rounded-2xl border-2"
+                          style={{
+                            background: 'linear-gradient(to right, #f0fdf4, #dcfce7)',
+                            borderColor: '#A0C878'
+                          }}
+                        >
+                          <h4 className="font-bold mb-2 flex items-center gap-2"
+                            style={{ color: '#7B9E5F' }}
+                          >
+                            📏 総距離
+                          </h4>
+                          <p className="text-2xl font-bold" style={{ color: '#7B9E5F' }}>
+                            {distance}
+                          </p>
+                        </div>
+                      )}
                     </div>
                   )}
 
-                  <div className="space-y-4">
-                    <h4 className="font-bold text-gray-900 text-xl mb-4">保存された場所：</h4>
-                    {locations.map((location, index) => (
-                      <div 
-                        key={location.id} 
-                        className="p-5 bg-gradient-to-r from-gray-50 to-gray-100 rounded-2xl hover:shadow-md transition border border-gray-200"
-                      >
-                        {location.photo_url && (
-                          <div className="mb-4 rounded-xl overflow-hidden">
+                  {locations.length === 0 && !tempLocation && (
+                    <div className="text-center py-12">
+                      <div className="text-5xl mb-4">🗺️</div>
+                      <p className="text-gray-500">場所を検索して追加しましょう</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* 折りたたみボタン */}
+            <button
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              className="absolute top-4 z-50 text-white shadow-xl transition-all px-3 py-6 font-bold"
+              style={{
+                background: 'linear-gradient(135deg, #4285F4 0%, #1a73e8 100%)',
+                left: sidebarCollapsed ? '0px' : '400px',
+                borderRadius: sidebarCollapsed ? '0 12px 12px 0' : '0 12px 12px 0'
+              }}
+            >
+              {sidebarCollapsed ? '☰' : '✕'}
+            </button>
+
+            {/* OpenStreetMap */}
+            <div className="flex-1 relative">
+              {typeof window !== 'undefined' && (
+                <MapContainer
+                  key={`${mapCenter[0]}-${mapCenter[1]}-${mapZoom}`}
+                  center={mapCenter}
+                  zoom={mapZoom}
+                  style={{ height: '100%', width: '100%' }}
+                  zoomControl={true}
+                >
+                  <TileLayer
+                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                  />
+                  
+                  {/* マーカー */}
+                  {locations.map((location) => (
+                    <Marker
+                      key={location.id}
+                      position={[location.latitude, location.longitude]}
+                      icon={createCustomIcon(selectedLocation?.id === location.id)}
+                      eventHandlers={{
+                        click: () => setSelectedLocation(location)
+                      }}
+                    >
+                      <Popup>
+                        <div style={{ minWidth: '250px', maxWidth: '300px' }}>
+                          {location.photo_url && (
                             <img 
-                              src={location.photo_url} 
+                              src={location.photo_url}
                               alt={location.location_name}
-                              className="w-full h-48 object-cover"
+                              style={{
+                                width: '100%',
+                                height: '150px',
+                                objectFit: 'cover',
+                                borderRadius: '8px',
+                                marginBottom: '12px'
+                              }}
                             />
-                          </div>
-                        )}
-                        
-                        <div className="flex items-start justify-between gap-3 mb-3">
-                          <div className="flex items-center gap-3">
-                            <span className="text-2xl">📍</span>
-                            <h3 className="font-bold text-gray-900 text-lg">
-                              {index + 1}. {location.location_name}
-                            </h3>
-                          </div>
+                          )}
+                          
+                          <h3 style={{ 
+                            margin: '0 0 8px 0', 
+                            fontSize: '18px',
+                            fontWeight: 'bold',
+                            color: '#1a73e8'
+                          }}>
+                            📍 {location.location_name}
+                          </h3>
+                          
+                          <p style={{ 
+                            margin: '4px 0 12px 0', 
+                            fontSize: '14px',
+                            color: '#6b7280',
+                            lineHeight: '1.5'
+                          }}>
+                            {location.description}
+                          </p>
+
                           <button
                             onClick={() => deleteLocation(location.id)}
-                            className="px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition text-sm font-medium whitespace-nowrap flex items-center gap-1"
+                            style={{
+                              width: '100%',
+                              padding: '8px 16px',
+                              background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '8px',
+                              fontWeight: 'bold',
+                              cursor: 'pointer',
+                              fontSize: '14px'
+                            }}
                           >
                             🗑️ 削除
                           </button>
                         </div>
-                        
-                        {location.character_name && (
-                          <p className="text-blue-600 mb-2 ml-9 font-medium">
-                            👤 {location.character_name}
-                          </p>
-                        )}
-                        <p className="text-gray-700 ml-9 leading-relaxed">{location.description}</p>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              ) : (
-                <div className="text-center py-12">
-                  <div className="text-6xl mb-4">🗺️</div>
-                  <p className="text-gray-500 text-lg">この本の場所情報はまだ登録されていません</p>
-                  <p className="text-gray-400 text-sm mt-2">上の検索バーで場所を追加してみてください</p>
-                </div>
+                      </Popup>
+                    </Marker>
+                  ))}
+                  
+                  {/* 場所間の線 */}
+                  {locations.length > 1 && (
+                    <Polyline
+                      positions={locations.map(loc => [loc.latitude, loc.longitude])}
+                      color="#4285F4" 
+                      weight={4}
+                      opacity={0.8}
+                    />
+                  )}
+                </MapContainer>
               )}
             </div>
           </div>
@@ -776,6 +935,10 @@ export default function ImprovedReaderPage() {
         }
         .animate-slideInRight {
           animation: slideInRight 0.3s ease-out;
+        }
+        .custom-marker {
+          background: transparent !important;
+          border: none !important;
         }
       `}</style>
     </div>
