@@ -35,18 +35,19 @@ export default function Header() {
     { icon: '🏠', label: 'Home', href: '/', subtitle: 'ホーム' },
     { icon: '📖', label: 'Books', href: '/books', subtitle: '本を探す' },
     { icon: '✍️', label: 'Stories', href: '/stories', subtitle: '作品を読む' },
+    { icon: '👥', label: 'Authors', href: '/authors', subtitle: '著者を探す' },
   ];
 
   const myPageItems = isLoggedIn ? [
     { icon: '✨', label: 'Write', href: '/write', subtitle: '作品を書く', highlight: true },
     { icon: '📚', label: 'My Library', href: '/my-bookshelf', subtitle: '私の本棚' },
     { icon: '📝', label: 'My Stories', href: '/my-stories', subtitle: '私の作品' },
-    { icon: '📖', label: 'Vocabulary', href: '/vocabulary', subtitle: '単語帳' },
+    { icon: '📖', label: 'My Vocabulary', href: '/vocabulary', subtitle: '私の単語帳' },
   ] : [];
 
   const settingsItems = isLoggedIn ? [
     { icon: '⚙️', label: 'Profile', href: '/profile', subtitle: 'プロフィール' },
-    { icon: '🎨', label: 'Author Page', href: `/author/${user?.id}`, subtitle: '作家ページ' },
+    { icon: '🎨', label: 'My Author Page', href: `/authors/${user?.id}`, subtitle: '私の作家ページ' },
   ] : [];
 
   const isActive = (href: string) => pathname === href;

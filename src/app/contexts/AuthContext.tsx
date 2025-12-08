@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation';
 // 認証情報の型
 type AuthContextType = {
   user: User | null;
+  userRole: string; // 追加
   isLoggedIn: boolean;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
@@ -20,6 +21,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 // Providerコンポーネント
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [userRole, setUserRole] = useState<string>('user'); // 追加
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
@@ -28,18 +30,53 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     checkUser();
 
     // 認証状態の変更を監視
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setUser(session?.user ?? null);
+      
+      // ユーザーがログインしている場合、roleを取得
+      if (session?.user) {
+        await fetchUserRole(session.user.id);
+      } else {
+        setUserRole('user'); // ログアウト時はuserにリセット
+      }
+      
       setLoading(false);
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
+  // ユーザーのroleを取得する関数
+  const fetchUserRole = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('user_id', userId)
+        .single();
+
+      if (error) {
+        console.error('Role取得エラー:', error);
+        setUserRole('user'); // エラー時はuserにする
+        return;
+      }
+
+      setUserRole(data?.role || 'user');
+    } catch (error) {
+      console.error('Role取得エラー:', error);
+      setUserRole('user');
+    }
+  };
+
   const checkUser = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       setUser(user);
+      
+      // ユーザーが存在する場合、roleを取得
+      if (user) {
+        await fetchUserRole(user.id);
+      }
     } catch (error) {
       console.error('ユーザー確認エラー:', error);
     } finally {
@@ -57,6 +94,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (error) throw error;
 
       setUser(data.user);
+      
+      // ログイン時にroleを取得
+      if (data.user) {
+        await fetchUserRole(data.user.id);
+      }
+      
       console.log('✅ ログインしました！');
       router.push('/books');
     } catch (error) {
@@ -71,6 +114,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (error) throw error;
 
       setUser(null);
+      setUserRole('user'); // ログアウト時にroleをリセット
       console.log('❌ ログアウトしました！');
       router.push('/');
     } catch (error) {
@@ -81,7 +125,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isLoggedIn = !!user;
 
   return (
-    <AuthContext.Provider value={{ user, isLoggedIn, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, userRole, isLoggedIn, loading, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

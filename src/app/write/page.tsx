@@ -1,5 +1,6 @@
 'use client';
 
+import { Suspense } from 'react';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/app/contexts/AuthContext';
@@ -15,7 +16,8 @@ interface Chapter {
   content: string;
 }
 
-export default function WritePage() {
+// 内部コンポーネント（useSearchParams を使用）
+function WritePageContent() {
   const { user, isLoggedIn } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -457,5 +459,18 @@ export default function WritePage() {
 
       </div>
     </div>
+  );
+}
+
+// メインコンポーネント（Suspenseでラップ）
+export default function WritePage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50 flex items-center justify-center">
+        <div className="text-xl text-gray-600">Loading...</div>
+      </div>
+    }>
+      <WritePageContent />
+    </Suspense>
   );
 }

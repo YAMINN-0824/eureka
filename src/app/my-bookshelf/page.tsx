@@ -27,7 +27,9 @@ interface Book {
 }
 
 export default function MyBookshelfPage() {
-  const { user, isLoggedIn } = useAuth();
+  const { user, userRole, isLoggedIn } = useAuth(); // ← userRoleを追加
+  console.log('👤 User:', user?.email);
+  console.log('🔑 Role:', userRole);
   const router = useRouter();
   const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
